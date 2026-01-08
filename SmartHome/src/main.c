@@ -73,7 +73,7 @@ void listening_events(void) {
         );
         GET_SWITCH_VALUE(&kr_switch,
             {
-                truct event *new_event = k_malloc(sizeof(struct event));
+                struct event *new_event = k_malloc(sizeof(struct event));
                 if (!new_event) return;
                 new_event->is_gpio_device = false;
                 new_event->pwm_device = &kr_pwdled;
@@ -166,20 +166,20 @@ int main(void)
     /*
     Switch settup
     */
-   if (!gpio_is_ready_dt(&lr_switch)) {
+   if (!gpio_is_ready_dt(lr_switch.switch_device)) {
         printk("The Livin switch pin GPIO port is not ready.\n");
         return;
     }
-    ret = gpio_pin_configure_dt(&lr_switch, GPIO_INPUT | lr_switch.dt_flags);
+    ret = gpio_pin_configure_dt(lr_switch.switch_device, GPIO_INPUT | kr_switch.switch_device->dt_flags);
     if (ret != 0) {
         printk("Configuring Living GPIO pin failed: %d\n", ret);
         return;
     }
-    if (!gpio_is_ready_dt(&kr_switch)) {
+    if (!gpio_is_ready_dt(kr_switch.switch_device)) {
         printk("The Kit switch pin GPIO port is not ready.\n");
         return;
     }
-    ret = gpio_pin_configure_dt(&kr_switch, GPIO_INPUT | kr_switch.dt_flags);
+    ret = gpio_pin_configure_dt(kr_switch.switch_device, GPIO_INPUT | kr_switch.switch_device->dt_flags);
     if (ret != 0) {
         printk("Configuring kit GPIO pin failed: %d\n", ret);
         return;
