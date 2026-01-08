@@ -1,0 +1,60 @@
+/ {
+    aliases {
+        pwmlivingroom = &pwm_0;
+        pwmkitchen = &pwm_1;
+        switchlivingroom = &switch_livingroom;
+        switchkitchen = &switch_kitchen;
+    };
+
+    pwmleds {
+        compatible = "pwm-leds";
+
+        pwm_0: pwm_0 {
+            pwms = <&pwm4 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+            label = "Living room light PWM";
+        };
+        pwm_1: pwm_1 {
+            pwms = <&pwm4 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+            label = "Living room light PWM";
+        };
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+
+        switch_livingroom: btn_livingroom {
+            label = "Living Room switch";
+			gpios = < &gpioa 0x5 GPIO_ACTIVE_HIGH >;
+            status = "okay";
+        };
+
+        switch_kitchen: btn_kitchen {
+            label = "Kitchen Room switch";
+			gpios = < &gpioa 0x6 GPIO_ACTIVE_HIGH >;
+            status = "okay";
+        };
+    };
+    
+};
+
+&timers1 {
+    status = "okay";
+    st,prescaler = <0>;
+
+    pwm4: pwm {
+        compatible = "st,stm32-pwm";
+        status = "okay";
+        #pwm-cells = <3>; 
+        pinctrl-0 = <&pwm4_ch3 &pwm4_ch4>;
+        pinctrl-names = "default";
+    };
+};
+
+&pinctrl {
+    pwm4_ch3: pwm4_ch3 {
+        pinmux = <STM32_PINMUX('B', 8, AF1)>;
+    };
+    pwm4_ch4: pwm4_ch4 {
+        pinmux = <STM32_PINMUX('B', 9, AF1)>;
+    };
+};
