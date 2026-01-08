@@ -191,14 +191,12 @@ int main(void)
 
     while (1) {
 
-        // ON LED code
         ret = gpio_pin_toggle_dt(&power_led);
         if (ret < 0) {
             return -1;
         }
         led_state = !led_state;
         log_msg("State of LED changed to: %s\n", led_state ? "ON" : "OFF");
-        // ON LED code end
         if (i % 2 == 0)
             ret = gpio_pin_toggle_dt(&power_led_info);
         if (i++ % 4 == 0)
