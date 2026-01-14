@@ -8,6 +8,21 @@
 #include <stddef.h>
 #include <string.h>
 
+extern struct k_fifo events_fifo;
+
+enum {
+    ROOM_LED_POWER,
+    ROOM_LED_INFO,
+    ROOM_LED_ERROR,
+    ROOM_LED_COUNT
+};
+
+enum {
+    LIVINROOM_ROOM,
+    KITCHEN_ROOM,
+    STRUCT_ROOM_COUNT
+};
+
 typedef void (*event_action_t)(void *ctx, uint16_t value);
 
 struct Event {
@@ -35,5 +50,13 @@ struct Room {
 void gpio_event_action(void *ctx, uint16_t value);
 
 void pwm_event_action(void *ctx, uint16_t value);
+
+bool room_device_init();
+
+struct Room** get_all_rooms();
+
+struct Room* get_room_by_id(int id);
+
+const struct gpio_dt_spec* get_led_by_id(int id);
 
 #endif
