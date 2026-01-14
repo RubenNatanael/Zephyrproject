@@ -3,139 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Static Web Page</title>
+    <title>Nucleo Smart Hub</title>
     <style>
-        /* Reset and basic styling */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f4f4f4;
-            color: #333;
+        :root { --bg: #0f172a; --card: rgba(255,255,255,0.05); --primary: #8b5cf6; --text-dim: #94a3b8; }
+        body { 
+            background: var(--bg); color: white; font-family: sans-serif; 
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
         }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, 320px); gap: 20px; justify-content: center; width: 100%; }
+        .card { 
+            background: var(--card); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 24px; padding: 20px; transition: 0.3s; overflow: hidden; height: 300px;
+        }
+        .card.expanded { height: 520px; border-color: var(--primary); }
+        .flex { display: flex; justify-content: space-between; align-items: center; }
+        .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; }
+        
+        /* Toggle Styling */
+        .switch { width: 44px; height: 24px; position: relative; display: inline-block; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #334155; transition: .3s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
 
-        /* Header */
-        header {
-            background-color: #3498db;
-            color: white;
-            padding: 20px 0;
-            text-align: center;
+        /* Dual Temp Display */
+        .temp-box { position: relative; width: 180px; height: 140px; margin: 10px auto; touch-action: none; cursor: pointer;}
+        .temp-display { 
+            position: absolute; bottom: 5px; width: 100%; text-align: center; 
+            display: flex; flex-direction: column; align-items: center; line-height: 1;
         }
-
-        header h1 {
-            margin: 0;
-            font-size: 2em;
-        }
-
-        /* Navigation */
-        nav {
-            background-color: #2980b9;
-            display: flex;
-            justify-content: center;
-        }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            padding: 15px 25px;
-            display: inline-block;
-            transition: background 0.3s;
-        }
-
-        nav a:hover {
-            background-color: #1f618d;
-        }
-
-        /* Main content */
-        main {
-            padding: 50px 20px;
-            text-align: center;
-        }
-
-        main h2 {
-            margin-bottom: 20px;
-        }
-
-        main p {
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-
-        /* Buttons */
-        .btn {
-            background-color: #3498db;
-            color: white;
-            padding: 15px 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: background 0.3s, transform 0.2s;
-            margin: 10px;
-        }
-
-        .btn:hover {
-            background-color: #2980b9;
-            transform: scale(1.05);
-        }
-
-        /* Footer */
-        footer {
-            background-color: #2c3e50;
-            color: white;
-            text-align: center;
-            padding: 20px 0;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-        }
+        .real-val { font-size: 2.8rem; font-weight: 800; color: #fff; }
+        .target-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 8px; letter-spacing: 1px;}
+        .target-val { font-size: 1.2rem; font-weight: 600; color: var(--primary); }
+        
+        .schedule { opacity: 0; margin-top: 20px; transition: 0.3s; pointer-events: none; }
+        .expanded .schedule { opacity: 1; pointer-events: auto; }
+        .sched-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <h1>My Static Web Page</h1>
-    </header>
+    <h2 style="color: #a855f7; margin-bottom: 30px;">Nucleo Control</h2>
+    <div class="grid" id="container"></div>
 
-    <!-- Navigation -->
-    <nav>
-        <a href="#home">Home</a>
-        <a href="#about">About</a>
-        <a href="#contact">Contact</a>
-    </nav>
+    <script>
+        // "temp" is what the sensor reads. "setpoint" is what the user wants.
+        const rooms = [
+            { id: 0, name: 'Test Room', temp: 24, setpoint: 22, light: 1 },
+            { id: 1, name: 'Living Room', temp: 24, setpoint: 22, light: 1 },
+            { id: 2, name: 'Bedroom', temp: 20, setpoint: 19, light: 0 }
+        ];
 
-    <!-- Main content -->
-    <main>
-        <h2>Welcome!</h2>
-        <p>This is a static web page with navigation and buttons. You can use this template for your projects.</p>
-
-        <!-- Buttons -->
-        <button class="btn" onclick="postLed(0)">OFF</button>
-        <button class="btn" onclick="postLed(1)">ON</button>
-
-    </main>
-
-    <!-- Footer -->
-    <footer>
-        &copy; 2026 My Static Web Page. All rights reserved.
-    </footer>
-
-</body>
-
-<script>
-    async function postLed(state)
-    {
-        try {
-            const payload = JSON.stringify({"switch_num" : 0, "switch_val" : state});
-
-            const response = await fetch("/led", {method : "POST", body : payload});
-            if (!response.ok) {
-                throw new Error(`Response satus: ${response.status}`);
-            }
-        } catch (error) {
-            console.error(error.message);
+        function createCard(r) {
+            return `
+            <div class="card" id="card-${r.id}">
+                <div class="flex">
+                    <span style="font-weight:bold">${r.name}</span>
+                    <button class="icon-btn" onclick="toggleEx(${r.id})">⚙️</button>
+                </div>
+                <div class="flex" style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 15px;">
+                    <span>💡 Light</span>
+                    <label class="switch">
+                        <input type="checkbox" ${r.light ? 'checked' : ''} onchange="postLed(${r.id}, this.checked ? 1 : 0)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="temp-box" onmousedown="startDrag(event, ${r.id})" ontouchstart="startDrag(event, ${r.id})">
+                    <svg viewBox="0 0 100 50" width="180">
+                        <path d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#2d2d44" stroke-width="6" stroke-linecap="round"/>
+                        <path id="prog-${r.id}" d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#8b5cf6" stroke-width="7" stroke-linecap="round" stroke-dasharray="0, 126"/>
+                    </svg>
+                    <div class="temp-display">
+                        <div class="real-val"><span id="real-${r.id}">${r.temp}</span>°</div>
+                        <div class="target-label">Target</div>
+                        <div class="target-val"><span id="set-${r.id}">${r.setpoint}</span>°</div>
+                    </div>
+                </div>
+                <div class="schedule">
+                    <div class="sched-item flex"><span>Morning</span><b>21°C</b></div>
+                    <div class="sched-item flex"><span>Night</span><b>18°C</b></div>
+                </div>
+            </div>`;
         }
-    }
-</script>
+
+        let dragging = false, activeId = null;
+
+        function toggleEx(id) { document.getElementById(`card-${id}`).classList.toggle('expanded'); }
+        function startDrag(e, id) { dragging = true; activeId = id; update(e); }
+        
+        window.onmousemove = window.ontouchmove = (e) => { if(dragging) update(e.touches ? e.touches[0] : e); };
+        
+        window.onmouseup = window.ontouchend = () => { 
+            if(dragging) {
+                const targetTemp = parseInt(document.getElementById(`set-${activeId}`).innerText);
+                postTemp(activeId, targetTemp);
+            }
+            dragging = false; 
+        };
+
+        function update(e) {
+            const box = document.querySelector(`#card-${activeId} .temp-box`);
+            const rect = box.getBoundingClientRect();
+            let p = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+            let t = Math.round(16 + (p * 14)); // Range 16-30
+            document.getElementById(`set-${activeId}`).innerText = t;
+            document.getElementById(`prog-${activeId}`).style.strokeDasharray = `${p * 126}, 126`;
+        }
+
+        async function postLed(roomId, value) {
+            let path_url = '/light_gpio';
+            if (roomId == 0 ) {
+                path_url = '/led';
+            }
+            try {
+                const payload = JSON.stringify({"switch_num" : roomId, "switch_val" : value});
+                await fetch(path_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+            } catch (err) { console.error("Nucleo Offline", err); }
+        }
+
+        async function postTemp(roomId, value) {
+            try {
+                const payload = JSON.stringify({"temp_num" : roomId, "temp_val" : value});
+                await fetch('/temp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+            } catch (err) { console.error("Nucleo Offline", err); }
+        }
+
+        document.getElementById('container').innerHTML = rooms.map(createCard).join('');
+        rooms.forEach(r => {
+            let p = (r.setpoint - 16) / 14;
+            document.getElementById(`prog-${r.id}`).style.strokeDasharray = `${p * 126}, 126`;
+        });
+    </script>
+</body>
 </html>

@@ -30,7 +30,7 @@ void listening_events_thread(void) {
 
             struct Event *new_event = k_malloc(sizeof(struct Event));
             if (!new_event) {
-                LOG_WAR("Unable to allocate memory for event\n");
+                LOG_ERR("Unable to allocate memory for event\n");
                 return;
             }
 
