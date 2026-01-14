@@ -9,7 +9,7 @@
 #include "Room.h"
 
 
-LOG_MODULE_REGISTER(simple_server, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(web_server, LOG_LEVEL_DBG);
 static uint16_t ui_port = 80;
 
 static const uint8_t index_html[] = {

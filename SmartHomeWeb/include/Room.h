@@ -5,6 +5,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/pwm.h>
+#include <zephyr/logging/log.h>
 #include <stddef.h>
 #include <string.h>
 

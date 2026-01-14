@@ -4,21 +4,18 @@
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/net/http/server.h>
 #include <zephyr/net/http/service.h>
+#include <zephyr/logging/log.h>
 #include <stddef.h>
 #include <string.h>
 
 #include "Room.h"
 
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+
+
 #define SLEEP_TIME_MS 200
 #define STACKSIZE 1024
 #define PRIORITY 7
-
-void log_msg(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vprintk(fmt, args);
-    va_end(args);
-}
 
 void listening_events_thread(void) {
 
@@ -33,7 +30,7 @@ void listening_events_thread(void) {
 
             struct Event *new_event = k_malloc(sizeof(struct Event));
             if (!new_event) {
-                printk("Unable to allocate memory for event\n");
+                LOG_WAR("Unable to allocate memory for event\n");
                 return;
             }
 
@@ -77,16 +74,16 @@ void execut_events_thread(void) {
 
 int main(void)
 {
-    printk("Booting C++ Zephyr LightSwitch app\n");
+    LOG_INF("Booting C++ Zephyr LightSwitch app\n");
     if (!room_device_init()) {
-        printk("Error while initializing the devices\n");
+        LOG_ERR("Error while initializing the devices\n");
         return 0;
     }
 
     int ret = 0;
     ret = http_server_start();
     if (ret) {
-        printk("Server failed: %d", ret);
+        LOG_ERR("Server failed: %d", ret);
     }
     while (1) {
 
