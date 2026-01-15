@@ -65,7 +65,7 @@
                 <div class="flex" style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 15px;">
                     <span>💡 Light</span>
                     <label class="switch">
-                        <input type="checkbox" ${r.light ? 'checked' : ''} onchange="postLed(${r.id}, this.checked ? 1 : 0)">
+                        <input type="checkbox" ${r.light ? 'checked' : ''} onchange="postLight(${r.id}, this.checked ? 1 : 0)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -111,13 +111,14 @@
             document.getElementById(`prog-${activeId}`).style.strokeDasharray = `${p * 126}, 126`;
         }
 
-        async function postLed(roomId, value) {
-            let path_url = '/light_gpio';
+        async function postLight(roomId, value) {
+            let path_url = '/api/v1/light';
+            let payload = JSON.stringify({"room_id" : roomId, "light_value" : value});
             if (roomId == 0 ) {
-                path_url = '/led';
+                path_url = '/api/v1/led';
+                payload = JSON.stringify({"led_num" : roomId, "led_val" : value});
             }
             try {
-                const payload = JSON.stringify({"switch_num" : roomId, "switch_val" : value});
                 await fetch(path_url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

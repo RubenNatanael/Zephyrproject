@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #define STACKSIZE 1024
 #define PRIORITY 7
 
-void listening_events_thread(void) {
+void listening_switch_events_thread(void) {
 
     struct Room **rooms = get_all_rooms();
 
@@ -28,9 +28,11 @@ void listening_events_thread(void) {
 
             bool new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
+            if (new_state == rooms[i]->light_value) continue;
+
             struct Event *new_event = k_malloc(sizeof(struct Event));
             if (!new_event) {
-                LOG_ERR("Unable to allocate memory for event\n");
+                LOG_ERR("Unable to allocate memory for event");
                 return;
             }
 
@@ -74,9 +76,9 @@ void execut_events_thread(void) {
 
 int main(void)
 {
-    LOG_INF("Booting C++ Zephyr LightSwitch app\n");
+    LOG_INF("Booting C++ Zephyr LightSwitch app");
     if (!room_device_init()) {
-        LOG_ERR("Error while initializing the devices\n");
+        LOG_ERR("Error while initializing the devices");
         return 0;
     }
 
@@ -85,6 +87,7 @@ int main(void)
     if (ret) {
         LOG_ERR("Server failed: %d", ret);
     }
+    LOG_INF("HTTP server started");
     while (1) {
 
         ret = gpio_pin_toggle_dt(get_led_by_id(ROOM_LED_POWER));
@@ -99,7 +102,7 @@ int main(void)
 }
 
 // --- Thread definitions ---
-K_THREAD_DEFINE(listening_id, STACKSIZE, listening_events_thread, NULL, NULL, NULL,
+K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
                 PRIORITY, 0, 0);
 K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
                 PRIORITY, 0, 0);

@@ -49,7 +49,7 @@ bool room_device_init() {
 
     /* PWM signal for leds init */
     if (!device_is_ready(lr_pwdled.dev) || !device_is_ready(kr_pwdled.dev)) {
-        LOG_ERR("PWM devices not ready\n");
+        LOG_ERR("PWM devices not ready");
         return false;
     }
 
@@ -61,12 +61,12 @@ bool room_device_init() {
         if (!gpio_is_ready_dt(switches[i])) return 0;
         ret = gpio_pin_configure_dt(switches[i], GPIO_INPUT | switches[i]->dt_flags);
         if (ret != 0) {
-            LOG_ERR("Configuring kit GPIO pin failed: %d\n", ret);
+            LOG_ERR("Configuring kit GPIO pin failed: %d", ret);
             return false;
         }
     }
 
-	LOG_INF("Initialization and configuration switch done.\n");
+	LOG_INF("Initialization and configuration switch done.");
     return true;
 }
  
