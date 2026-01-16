@@ -26,6 +26,12 @@ struct room_light_command {
 	int light_value;
 };
 
+struct room_temp_read_command {
+	int room_id;
+	int temp_value;
+	int hum_value;
+};
+
 static const struct json_obj_descr led_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct led_command, led_num, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct led_command, led_val, JSON_TOK_NUMBER),
@@ -34,6 +40,12 @@ static const struct json_obj_descr led_command_descr[] = {
 static const struct json_obj_descr room_light_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_light_command, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_light_command, light_value, JSON_TOK_NUMBER),
+};
+
+static const struct json_obj_descr room_temp_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, temp_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, hum_value, JSON_TOK_NUMBER),
 };
 
 typedef void (*post_parser_fn)(uint8_t *buf, size_t len);
@@ -80,27 +92,9 @@ static void parse_room_light_post(uint8_t *buf, size_t len)
 
 	LOG_INF("POST request setting LED %d to state %d", cmd.room_id, cmd.light_value);
 
-    const struct Room *room = get_room_by_id(cmd.room_id);
+    struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
-
-        struct Event *new_event = k_malloc(sizeof(struct Event));
-		if (!new_event) {
-			LOG_ERR("Unable to allocate memory for event");
-			return;
-		}
-
-		/* Register light events */
-		if (room->light_gpio != NULL) {
-			new_event->action = gpio_event_action;
-			new_event->ctx = (void *)room->light_gpio;
-			new_event->value = cmd.light_value;
-		}
-		if (room->light_pwm != NULL) {
-			new_event->action = pwm_event_action;
-			new_event->ctx = (void *)room->light_pwm;
-			new_event->value = cmd.light_value;;
-		}
-		k_fifo_put(&events_fifo, new_event);
+        register_new_event(room, cmd.light_value);
 	}
 }
 

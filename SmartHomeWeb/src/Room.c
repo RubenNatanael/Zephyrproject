@@ -14,23 +14,49 @@ static const struct gpio_dt_spec leds[ROOM_LED_COUNT] = {
     GPIO_DT_SPEC_GET(LED2_NODE, gpios),
 };
 
+#define DHT0_ALIAS DT_ALIAS(dht0)
+#define DHT1_ALIAS DT_ALIAS(dht1)
+
+static const struct device *const dht_devices[] = {
+    DEVICE_DT_GET(DHT0_ALIAS),
+    DEVICE_DT_GET(DHT1_ALIAS),
+};
+
 static const struct pwm_dt_spec lr_pwdled = PWM_DT_SPEC_GET(DT_ALIAS(pwmlivingroom));
 static const struct pwm_dt_spec kr_pwdled = PWM_DT_SPEC_GET(DT_ALIAS(pwmkitchen));
 
 static const struct gpio_dt_spec lr_gpio_switch = GPIO_DT_SPEC_GET_OR(DT_ALIAS(switchlivingroom), gpios, {0});
 static const struct gpio_dt_spec kr_gpio_switch = GPIO_DT_SPEC_GET_OR(DT_ALIAS(switchkitchen), gpios, {0});
 
+/* RTIO devices for reading temperature/humidity channels */
+SENSOR_DT_READ_IODEV(dht_iodev0,
+                     DHT0_ALIAS,
+                     { SENSOR_CHAN_AMBIENT_TEMP, 0 },
+                     { SENSOR_CHAN_HUMIDITY, 0 });
+
+SENSOR_DT_READ_IODEV(dht_iodev1,
+                     DHT1_ALIAS,
+                     { SENSOR_CHAN_AMBIENT_TEMP, 0 },
+                     { SENSOR_CHAN_HUMIDITY, 0 });
+
+RTIO_DEFINE(dht_ctx, 1, 1);
+
+
 static struct Room lr_room  = { 
     .light_switch = &lr_gpio_switch, 
     .light_gpio = &leds[ROOM_LED_ERROR], 
     .light_pwm = NULL, 
-    .light_value = 0 
+    .light_value = 0,
+    .dht_devices = dht_devices[0],
+    .dht_iodevs = &dht_iodev0
 };
 static struct Room kr_room = { 
     .light_switch = &kr_gpio_switch, 
     .light_gpio = NULL, 
     .light_pwm = &kr_pwdled, 
-    .light_value = 0
+    .light_value = 0,
+    .dht_devices = dht_devices[1],
+    .dht_iodevs = &dht_iodev1
 };
 
 static struct Room *rooms[STRUCT_ROOM_COUNT] = { 
@@ -66,6 +92,14 @@ bool room_device_init() {
         }
     }
 
+    /* Temp sensor init */
+    for (size_t i = 0; i < ARRAY_SIZE(dht_devices); i++) {
+		if (!device_is_ready(dht_devices[i])) {
+			printk("sensor: device %s not ready.\n", dht_devices[i]->name);
+			return 0;
+		}
+	}
+
 	LOG_INF("Initialization and configuration switch done.");
     return true;
 }
@@ -93,4 +127,70 @@ struct Room* get_room_by_id(int id) {
 const struct gpio_dt_spec* get_led_by_id(int id) {
     return &leds[id];
 }
+
+bool register_new_event(struct Room *room, uint16_t new_value) {
+    struct Event *new_event = k_malloc(sizeof(struct Event));
+    if (!new_event) {
+        LOG_ERR("Unable to allocate memory for event");
+        return false;
+    }
+
+    /* Register light events */
+    if (room->light_gpio != NULL) {
+        new_event->action = gpio_event_action;
+        new_event->ctx = (void *)room->light_gpio;
+        new_event->value = new_value ? 1 : 0;
+    }
+    if (room->light_pwm != NULL) {
+        new_event->action = pwm_event_action;
+        new_event->ctx = (void *)room->light_pwm;
+        new_event->value = new_value;
+    }
+
+    // TODO register heat events
+
+    k_fifo_put(&events_fifo, new_event);
+    return true;
+}
+
+int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit) {
+
+    int rc;
+
+    struct device *dev = (struct device *) room->dht_devices;
+
+    uint8_t buf[128];
+
+    rc = sensor_read(room->dht_iodevs, &dht_ctx, buf, 128);
+
+    if (rc != 0) {
+        LOG_WRN("%s: sensor_read() failed: %d\n", dev->name, rc);
+        return rc;
+    }
+
+    const struct sensor_decoder_api *decoder;
+
+    rc = sensor_get_decoder(dev, &decoder);
+
+    if (rc != 0) {
+        LOG_WRN("%s: sensor_get_decode() failed: %d\n", dev->name, rc);
+        return rc;
+    }
+
+    *temp_fit = 0;
+    struct sensor_q31_data temp_data = {0};
+
+    decoder->decode(buf,
+            (struct sensor_chan_spec) {SENSOR_CHAN_AMBIENT_TEMP, 0},
+            temp_fit, 1, &temp_data);
+
+    *hum_fit = 0;
+    struct sensor_q31_data hum_data = {0};
+
+    decoder->decode(buf,
+            (struct sensor_chan_spec) {SENSOR_CHAN_HUMIDITY, 0},
+            hum_fit, 1, &hum_data);
+    return 0;
+}
+
 

@@ -4,6 +4,11 @@
         pwmkitchen = &pwm_1;
         switchlivingroom = &switch_livingroom;
         switchkitchen = &switch_kitchen;
+
+        dht0 = &tempS0;
+		dht1 = &tempS1;
+		dht2 = &tempS2;
+		dht3 = &tempS3;
     };
 
     pwmleds {
@@ -36,6 +41,37 @@
     };
     
 };
+
+&i2c1 {
+	status = "okay";
+
+	tempS0: hs300x@44 {
+		compatible = "renesas,hs300x";
+		reg = <0x44>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+
+	tempS1: hs300x@48 {
+		compatible = "renesas,hs300x";
+		reg = <0x48>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+	tempS2: hs300x@4A {
+		compatible = "renesas,hs300x";
+		reg = <0x4A>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+	tempS3: hs300x@4B {
+		compatible = "renesas,hs300x";
+		reg = <0x4B>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+	};
+};
+
 
 &timers1 {
     status = "okay";

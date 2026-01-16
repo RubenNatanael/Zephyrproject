@@ -9,6 +9,11 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/drivers/sensor_data_types.h>
+#include <zephyr/rtio/rtio.h>
+
+
 extern struct k_fifo events_fifo;
 
 enum {
@@ -44,6 +49,8 @@ struct Room {
     uint16_t light_value;
 
     /* TODO Heat */
+    const struct device *const dht_devices;
+    struct rtio_iodev *const dht_iodevs;
     /* Temperature sensor */
     /* Temperature gpio */
 };
@@ -59,5 +66,9 @@ struct Room** get_all_rooms();
 struct Room* get_room_by_id(int id);
 
 const struct gpio_dt_spec* get_led_by_id(int id);
+
+bool register_new_event(struct Room *room, uint16_t new_value);
+
+int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
 
 #endif

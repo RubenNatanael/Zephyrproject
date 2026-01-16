@@ -28,31 +28,11 @@ void listening_switch_events_thread(void) {
 
             bool new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
-            if (new_state == rooms[i]->light_value) continue;
-
-            struct Event *new_event = k_malloc(sizeof(struct Event));
-            if (!new_event) {
-                LOG_ERR("Unable to allocate memory for event");
-                return;
-            }
-
-            /* Register light events */
-            if (rooms[i]->light_gpio != NULL) {
-                new_event->action = gpio_event_action;
-                new_event->ctx = (void *)rooms[i]->light_gpio;
-                new_event->value = new_state;
-            }
-            if (rooms[i]->light_pwm != NULL) {
-                // PWM light needs special value so I calculated it here
+            if (new_state != rooms[i]->light_value) {
+                // In case is a PWM event light needs special value so I calculated it here
                 new_state = rooms[i]->light_pwm->period * percentage_ / 100;
-                new_event->action = pwm_event_action;
-                new_event->ctx = (void *)rooms[i]->light_pwm;
-                new_event->value = new_state;
+                register_new_event(rooms[i], new_state);
             }
-
-            // TODO register heat events
-
-            k_fifo_put(&events_fifo, new_event);
         }
 
         k_msleep(SLEEP_TIME_MS);
