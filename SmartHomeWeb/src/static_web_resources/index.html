@@ -50,9 +50,10 @@
     <script>
         // "temp" is what the sensor reads. "setpoint" is what the user wants.
         const rooms = [
-            { id: 0, name: 'Test Room', temp: 24, setpoint: 22, light: 1 },
-            { id: 1, name: 'Living Room', temp: 24, setpoint: 22, light: 1 },
-            { id: 2, name: 'Bedroom', temp: 20, setpoint: 19, light: 0 }
+            { id: 0, name: 'Test Room', temp: 24, setpoint: 22, light: 1, hum_value: 50 },
+            { id: 1, name: 'Living Room', temp: 24, setpoint: 22, light: 1, hum_value: 45 },
+            { id: 2, name: 'Bedroom', temp: 20, setpoint: 19, light: 0, hum_value: 40 },
+            { id: 3, name: 'Kitchen', temp: 22, setpoint: 21, light: 1, hum_value: 55 }
         ];
 
         function createCard(r) {
@@ -111,6 +112,7 @@
             document.getElementById(`prog-${activeId}`).style.strokeDasharray = `${p * 126}, 126`;
         }
 
+        // Call nucleo code to set light/led
         async function postLight(roomId, value) {
             let path_url = '/api/v1/light';
             let payload = JSON.stringify({"room_id" : roomId, "light_value" : value});
@@ -127,10 +129,11 @@
             } catch (err) { console.error("Nucleo Offline", err); }
         }
 
+        // Call nucleo code to set temperature
         async function postTemp(roomId, value) {
             try {
-                const payload = JSON.stringify({"temp_num" : roomId, "temp_val" : value});
-                await fetch('/temp', {
+                const payload = JSON.stringify({"room_id" : roomId, "temp_val" : value});
+                await fetch('/api/v1/temp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: payload
@@ -143,6 +146,34 @@
             let p = (r.setpoint - 16) / 14;
             document.getElementById(`prog-${r.id}`).style.strokeDasharray = `${p * 126}, 126`;
         });
+
+        // Is not calling back to nucleo, just receiving updates
+        window.addEventListener("DOMContentLoaded", (ev) => {
+            const ws = new WebSocket(`/ws`);
+            ws.onopen = () => {
+                console.log("Connected to Zephyr WebSocket");
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log("Received JSON:", data);
+
+                rooms[data.room_id].temp = data.temp_value;
+                rooms[data.room_id].hum_value = data.hum_value;
+                
+                console.log("TEMP: ", data.temp_value);
+                document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket disconnected");
+            };
+
+            ws.onerror = (err) => {
+                alert("WebSocket Error Detected!");
+                console.error("WebSocket error:", err);
+            };
+        })
     </script>
 </body>
 </html>

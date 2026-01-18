@@ -10,6 +10,18 @@
 
 #include "Room.h"
 
+#include <zephyr/sys/sys_heap.h>
+
+extern struct sys_heap _system_heap; // The default system heap
+
+void check_memory(void) {
+    struct sys_memory_stats stats;
+    sys_heap_runtime_stats_get(&_system_heap, &stats);
+
+    printk("Heap - Free: %zu | Allocated: %zu | Max: %zu\n", 
+            stats.free_bytes, stats.allocated_bytes, stats.max_allocated_bytes);
+}
+
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 
@@ -31,11 +43,39 @@ void listening_switch_events_thread(void) {
             if (new_state != rooms[i]->light_value) {
                 // In case is a PWM event light needs special value so I calculated it here
                 new_state = rooms[i]->light_pwm->period * percentage_ / 100;
-                register_new_event(rooms[i], new_state);
+                register_new_event(rooms[i], new_state, true);
+                rooms[i]->light_value = new_state;
             }
         }
 
         k_msleep(SLEEP_TIME_MS);
+    }
+}
+
+void listening_tmp_events_thread(void) {
+
+    struct Room **rooms = get_all_rooms();
+
+    while (1) {
+        int percentage_ = 50;
+
+        for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
+
+            uint32_t temp_value = 0;
+            uint32_t hum_value = 0;
+            read_temp_and_hum(rooms[i], &temp_value, &hum_value);
+
+            if (temp_value != rooms[i]->last_temp_value ||
+                hum_value != rooms[i]->last_hum_value) {
+                LOG_DBG("New temp/hum event in room %d: %d/%d", rooms[i]->room_id, temp_value, hum_value);
+                LOG_DBG("Old temp/hum event in room %d: %d/%d", rooms[i]->room_id, rooms[i]->last_temp_value, rooms[i]->last_hum_value);
+                register_new_temp_hum_event(rooms[i], temp_value, hum_value, true);
+                rooms[i]->last_temp_value = temp_value;
+                rooms[i]->last_hum_value = hum_value;
+            }
+        }
+
+        k_sleep(K_SECONDS(10));
     }
 }
 
@@ -70,11 +110,12 @@ int main(void)
     LOG_INF("HTTP server started");
     while (1) {
 
+        check_memory();
         ret = gpio_pin_toggle_dt(get_led_by_id(ROOM_LED_POWER));
         if (ret < 0) {
             return -1;
         }
-        k_msleep(SLEEP_TIME_MS);
+        k_sleep(K_SECONDS(2));
     }
 
     return 0;
@@ -85,4 +126,6 @@ int main(void)
 K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
                 PRIORITY, 0, 0);
 K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
+                PRIORITY, 0, 0);
+K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
                 PRIORITY, 0, 0);

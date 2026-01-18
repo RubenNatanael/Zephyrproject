@@ -60,13 +60,13 @@
 	};
 	tempS2: hs300x@4A {
 		compatible = "renesas,hs300x";
-		reg = <0x4A>;
+		reg = <0x4a>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 	};
 	tempS3: hs300x@4B {
 		compatible = "renesas,hs300x";
-		reg = <0x4B>;
+		reg = <0x4b>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 	};
