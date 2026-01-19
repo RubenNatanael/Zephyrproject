@@ -141,11 +141,34 @@
             } catch (err) { console.error("Nucleo Offline", err); }
         }
 
-        document.getElementById('container').innerHTML = rooms.map(createCard).join('');
-        rooms.forEach(r => {
-            let p = (r.setpoint - 16) / 14;
-            document.getElementById(`prog-${r.id}`).style.strokeDasharray = `${p * 126}, 126`;
-        });
+        async function fetchRooms() {
+            const container = document.getElementById('container');
+            container.innerHTML = '<p style="color: var(--text-dim);">Loading rooms...</p>';
+
+            try {
+                const response = await fetch('/api/v1/rooms');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const rooms = await response.json();
+
+                // Clear the container and populate it with fetched room data
+                container.innerHTML = rooms.map(createCard).join('');
+
+                // Update progress bars for each room
+                rooms.forEach(r => {
+                    let p = (r.setpoint - 16) / 14;
+                    document.getElementById(`prog-${r.id}`).style.strokeDasharray = `${p * 126}, 126`;
+                });
+            } catch (error) {
+                console.error('Error fetching rooms:', error);
+                container.innerHTML = '<p style="color: red;">Failed to load rooms. Please try again later.</p>';
+            }
+        }
+
+        // Fetch rooms dynamically when the page loads
+        window.addEventListener('DOMContentLoaded', fetchRooms);
 
         // Is not calling back to nucleo, just receiving updates
         window.addEventListener("DOMContentLoaded", (ev) => {
@@ -158,11 +181,25 @@
                 const data = JSON.parse(event.data);
                 console.log("Received JSON:", data);
 
-                rooms[data.room_id].temp = data.temp_value;
-                rooms[data.room_id].hum_value = data.hum_value;
-                
-                console.log("TEMP: ", data.temp_value);
-                document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
+                // Update temperature and humidity values
+                if (data.temp_value !== undefined) {
+                    rooms[data.room_id].temp = data.temp_value;
+                    rooms[data.room_id].hum_value = data.hum_value;
+                    
+                    console.log("TEMP: ", data.temp_value);
+                    document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
+                }
+
+                // Update light/led values
+                if (data.light_value !== undefined) {
+
+                    rooms[data.room_id].light = data.light_value;
+                    const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
+                    if (lightCheckbox) {
+                        lightCheckbox.checked = data.light_value === 1;
+                    }
+                    console.log(`Room ${data.room_id} light is now: ${data.light_value}`);
+                }
             };
 
             ws.onclose = () => {

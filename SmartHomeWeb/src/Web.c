@@ -6,6 +6,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/net/websocket.h>
+#include <zephyr/sys/time_units.h>
 
 #include "Room.h"
 
@@ -56,6 +57,14 @@ static const struct json_obj_descr room_temp_set_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, temp_value, JSON_TOK_NUMBER),
 };
+
+static const struct json_obj_descr room_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct Room, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, room_name, JSON_TOK_STRING),
+	JSON_OBJ_DESCR_PRIM(struct Room, last_temp_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, last_hum_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, light_value, JSON_TOK_NUMBER),
+}
 
 typedef void (*post_parser_fn)(uint8_t *buf, size_t len);
 
@@ -128,6 +137,27 @@ static void parse_temp_post(uint8_t *buf, size_t len)
 	}
 }
 
+static int rooms_get_handler(struct http_client_ctx *client, enum http_data_status status,
+		       const struct http_request_ctx *request_ctx,
+		       struct http_response_ctx *response_ctx, void *user_data)
+{
+	if (status == HTTP_SERVER_DATA_FINAL) {
+		struct Room **all_rooms = get_all_rooms();
+		uint8_t response_buf[512];
+		size_t num_rooms = get_room_count();
+		int ret;
+
+		ret = json_arr_encode_buf(room_descr, ARRAY_SIZE(room_descr), rooms, num_rooms, response_buf, sizeof(response_buf));
+		if (ret < 0) {
+			LOG_ERR("Failed to encode JSON: %d", ret);
+			http_response(client, HTTP_STATUS_INTERNAL_SERVER_ERROR, NULL, 0, NULL);
+			return -1;
+		}
+
+		http_response(client, HTTP_STATUS_OK, response_buf, ret, NULL);
+	}
+	return 0;
+}
 static struct post_state led_post_state = {
 	.buf = NULL,
 	.cursor = 0,
@@ -239,6 +269,15 @@ static struct http_resource_detail_dynamic room_temp_resource_detail = {
 	.user_data = &room_temp_post_state,
 };
 
+static struct http_resource_detail_dynamic room_command_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_DYNAMIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
+		},
+	.cb = rooms_get_handler,
+	.user_data = NULL,
+};
+
 /* START WEB sockets */
 
 #define MAX_WS_CLIENTS 5
@@ -249,15 +288,20 @@ static uint8_t ws_tx_buffer[128];
 
 int ws_setup(int ws_socket, struct http_request_ctx *req_ctx, void *user_data)
 {
+    uint64_t start_time = k_uptime_get();
     for (int i = 0; i < MAX_WS_CLIENTS; i++) {
         if (ws_clients[i] <= 0) {
             ws_clients[i] = ws_socket;
             LOG_INF("WebSocket client connected (slot %d)", i);
-			number_of_clients_connected++;
+            number_of_clients_connected++;
+            uint64_t end_time = k_uptime_get();
+            LOG_DBG("WebSocket setup time: %llu ms", end_time - start_time);
             return 0;
         }
     }
     LOG_ERR("No free WebSocket slots");
+    uint64_t end_time = k_uptime_get();
+    LOG_DBG("WebSocket setup time (failure): %llu ms", end_time - start_time);
     return -ENOMEM;
 }
 
@@ -269,21 +313,23 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
     (void)arg1; (void)arg2; (void)arg3;
 
     while (1) {
+        uint64_t start_time = k_uptime_get();
 
-		// Process all pending web events
-		struct WebEvent *new_web_event =k_fifo_get(&web_events_fifo,
-							   K_NO_WAIT);
-		if (new_web_event == NULL) {
-			k_msleep(100);
-			continue;
-		}
-		// Skip event processing if no clients are connected
-		if (number_of_clients_connected == 0) {
-			k_free(new_web_event);
-			k_msleep(100);
-			continue;
-		}
-		LOG_DBG("Sending data");
+        // Process all pending web events
+        struct WebEvent *new_web_event = k_fifo_get(&web_events_fifo, K_NO_WAIT);
+        if (new_web_event == NULL) {
+            k_msleep(100);
+            continue;
+        }
+
+        // Skip event processing if no clients are connected
+        if (number_of_clients_connected == 0) {
+            k_free(new_web_event);
+            k_msleep(100);
+            continue;
+        }
+
+        LOG_DBG("Sending data");
 
 		
 		
@@ -364,6 +410,9 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 				number_of_clients_connected--;
 			}
 		}
+        uint64_t end_time = k_uptime_get();
+        LOG_DBG("WebSocket thread processing time: %llu ms", end_time - start_time);
+
         k_msleep(100);
     }
 }
@@ -391,7 +440,7 @@ struct http_resource_detail_websocket ws_resource_detail = {
 
 /* END WEB sockets*/
 
-HTTP_SERVICE_DEFINE(test_http_service, NULL, &ui_port, 1, 10, NULL, NULL, NULL);
+HTTP_SERVICE_DEFINE(test_http_service, NULL, &ui_port, 5, 10, NULL, NULL, NULL);
 
 HTTP_RESOURCE_DEFINE(index_res, test_http_service, "/", &index_detail);
 
@@ -400,6 +449,8 @@ HTTP_RESOURCE_DEFINE(led_res, test_http_service, "/api/v1/led", &led_resource_de
 HTTP_RESOURCE_DEFINE(light_res, test_http_service, "/api/v1/light", &room_light_resource_detail);
 
 HTTP_RESOURCE_DEFINE(temp_res, test_http_service, "/api/v1/temp", &room_temp_resource_detail);
+
+HTTP_RESOURCE_DEFINE(room_res, test_http_service, "/api/v1/room", &room_command_detail);
 
 HTTP_RESOURCE_DEFINE(ws_res, test_http_service, "/ws", &ws_resource_detail);
 
