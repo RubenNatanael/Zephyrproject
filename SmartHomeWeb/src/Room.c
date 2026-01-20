@@ -47,6 +47,8 @@ RTIO_DEFINE(dht_ctx, 1, 1);
 
 
 static struct Room lr_room  = { 
+    .room_id = LIVINROOM_ROOM,
+    .room_name = "Living Room",
     .light_switch = &lr_gpio_switch, 
     .light_gpio = &leds[ROOM_LED_ERROR], 
     .light_pwm = NULL, 
@@ -61,6 +63,8 @@ static struct Room lr_room  = {
     .offset_desired_temperature = 50
 };
 static struct Room kr_room = { 
+    .room_id = KITCHEN_ROOM,
+    .room_name = "Kitchen",
     .light_switch = &kr_gpio_switch, 
     .light_gpio = NULL, 
     .light_pwm = &kr_pwdled, 
@@ -112,16 +116,16 @@ bool room_device_init() {
     }
 
     /* OUTPUT GPIO init */
-    const struct gpio_dt_spec *output_gpio[] = { &lr_gpio_relay_tmp, &kr_gpio_relay_tmp};
-    int number_of_switches = sizeof(output_gpio) / sizeof(struct gpio_dt_spec*);
-    for (int i = 0; i < number_of_switches; i++) {
-        if (!gpio_is_ready_dt(output_gpio[i])) return 0;
-        ret = gpio_pin_configure_dt(output_gpio[i], GPIO_OUTPUT | output_gpio[i]->dt_flags);
-        if (ret != 0) {
-            LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
-            return false;
-        }
-    }
+    // const struct gpio_dt_spec *output_gpio[] = { &lr_gpio_relay_tmp, &kr_gpio_relay_tmp};
+    // int number_of_out = sizeof(output_gpio) / sizeof(struct gpio_dt_spec*);
+    // for (int i = 0; i < number_of_out; i++) {
+    //     if (!gpio_is_ready_dt(output_gpio[i])) return 0;
+    //     ret = gpio_pin_configure_dt(output_gpio[i], GPIO_OUTPUT | output_gpio[i]->dt_flags);
+    //     if (ret != 0) {
+    //         LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
+    //         return false;
+    //     }
+    // }
 
     /* Temp sensor init */
     for (size_t i = 0; i < ARRAY_SIZE(dht_devices); i++) {

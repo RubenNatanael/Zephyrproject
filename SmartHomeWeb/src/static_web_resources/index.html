@@ -158,8 +158,8 @@
 
                 // Update progress bars for each room
                 rooms.forEach(r => {
-                    let p = (r.setpoint - 16) / 14;
-                    document.getElementById(`prog-${r.id}`).style.strokeDasharray = `${p * 126}, 126`;
+                    let p = (r.desired_temperature - 16) / 14;
+                    document.getElementById(`prog-${r.room_id}`).style.strokeDasharray = `${p * 126}, 126`;
                 });
             } catch (error) {
                 console.error('Error fetching rooms:', error);

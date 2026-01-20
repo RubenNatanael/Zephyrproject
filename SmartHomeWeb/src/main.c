@@ -67,8 +67,6 @@ void listening_tmp_events_thread(void) {
 
             if (temp_value != rooms[i]->temp_sensor_value ||
                 hum_value != rooms[i]->hum_sensor_value) {
-                LOG_DBG("New temp/hum event in room %d: %d/%d", rooms[i]->room_id, temp_value, hum_value);
-                LOG_DBG("Old temp/hum event in room %d: %d/%d", rooms[i]->room_id, rooms[i]->temp_sensor_value, rooms[i]->hum_sensor_value);
                 register_new_temp_hum_event(rooms[i], temp_value, hum_value, true);
                 rooms[i]->temp_sensor_value = temp_value;
                 rooms[i]->hum_sensor_value = hum_value;

@@ -61,23 +61,33 @@ static const struct json_obj_descr room_temp_set_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, desire_temp_value, JSON_TOK_NUMBER),
 };
+struct RoomData {
+    uint32_t room_id;
+    const char* room_name;
+    uint32_t temp_sensor_value;
+    uint32_t hum_sensor_value;
+    uint16_t light_gpio_value;
+    uint32_t desired_temperature;
+    bool heat_relay_state;
+};
+
 struct RoomCollection {
-    struct Room **rooms;
+    struct RoomData rooms[STRUCT_ROOM_COUNT];
     size_t num_rooms;
 };
 
 static const struct json_obj_descr room_command_descr[] = {
-	JSON_OBJ_DESCR_PRIM(struct Room, room_id, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, room_name, JSON_TOK_STRING),
-	JSON_OBJ_DESCR_PRIM(struct Room, temp_sensor_value, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, hum_sensor_value, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, light_gpio_value, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, desired_temperature, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, heat_relay_state, JSON_TOK_TRUE),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, room_name, JSON_TOK_STRING),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, temp_sensor_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, hum_sensor_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, light_gpio_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, desired_temperature, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct RoomData, heat_relay_state, JSON_TOK_TRUE),
 
 };
 static const struct json_obj_descr room_array_descr[] = {
-    JSON_OBJ_DESCR_OBJ_ARRAY(struct RoomCollection, rooms, 10, 
+    JSON_OBJ_DESCR_OBJ_ARRAY(struct RoomCollection, rooms, STRUCT_ROOM_COUNT, 
                              num_rooms, room_command_descr, ARRAY_SIZE(room_command_descr)),
 };
 
@@ -243,14 +253,29 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		       const struct http_request_ctx *request_ctx,
 		       struct http_response_ctx *response_ctx, void *user_data)
 {
+	LOG_ERR("Rooms GET handler status %d", status);
 	if (status == HTTP_SERVER_DATA_FINAL) {
+	LOG_ERR("in if final");
 
-		char json_buf[512];
+		static char json_buf[512];
 
-		struct RoomCollection collection = {
-			.rooms = get_all_rooms(),
-			.num_rooms = STRUCT_ROOM_COUNT
-		};
+		struct Room **hardware_rooms = get_all_rooms();
+		struct RoomCollection collection;
+		collection.num_rooms = STRUCT_ROOM_COUNT;
+		for (size_t i = 0; i < STRUCT_ROOM_COUNT; i++) {
+			collection.rooms[i].room_id = hardware_rooms[i]->room_id;
+			LOG_DBG("Room ID: %d", collection.rooms[i].room_id);
+			collection.rooms[i].room_name = hardware_rooms[i]->room_name;
+			LOG_DBG("Room name: %s", collection.rooms[i].room_name);
+			collection.rooms[i].temp_sensor_value = hardware_rooms[i]->temp_sensor_value;
+			LOG_DBG("Temp value: %d", collection.rooms[i].temp_sensor_value);
+			collection.rooms[i].hum_sensor_value = hardware_rooms[i]->hum_sensor_value;
+			collection.rooms[i].light_gpio_value = hardware_rooms[i]->light_gpio_value;
+			collection.rooms[i].desired_temperature = hardware_rooms[i]->desired_temperature;
+			collection.rooms[i].heat_relay_state = hardware_rooms[i]->heat_relay_state;
+		}
+		
+		LOG_ERR("ALL rooms gotten");
 
 		int ret = json_arr_encode_buf(
 			room_array_descr,
@@ -478,7 +503,7 @@ HTTP_RESOURCE_DEFINE(light_res, test_http_service, "/api/v1/light", &room_light_
 
 HTTP_RESOURCE_DEFINE(temp_res, test_http_service, "/api/v1/temp", &room_temp_resource_detail);
 
-HTTP_RESOURCE_DEFINE(room_res, test_http_service, "/api/v1/room", &room_command_detail);
+HTTP_RESOURCE_DEFINE(room_res, test_http_service, "/api/v1/rooms", &room_command_detail);
 
 HTTP_RESOURCE_DEFINE(ws_res, test_http_service, "/ws", &ws_resource_detail);
 
