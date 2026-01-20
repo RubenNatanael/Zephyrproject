@@ -50,35 +50,35 @@
     <script>
         // "temp" is what the sensor reads. "setpoint" is what the user wants.
         const rooms = [
-            { id: 0, name: 'Test Room', temp: 24, setpoint: 22, light: 1, hum_value: 50 },
-            { id: 1, name: 'Living Room', temp: 24, setpoint: 22, light: 1, hum_value: 45 },
-            { id: 2, name: 'Bedroom', temp: 20, setpoint: 19, light: 0, hum_value: 40 },
-            { id: 3, name: 'Kitchen', temp: 22, setpoint: 21, light: 1, hum_value: 55 }
+            { room_id: 0, room_name: 'Test Room', temp_sensor_value: 24, desired_temperature: 22, light_gpio_value: 1, hum_sensor_value: 50 },
+            { room_id: 1, room_name: 'Living Room', temp_sensor_value: 24, desired_temperature: 22, light_gpio_value: 1, hum_sensor_value: 45 },
+            { room_id: 2, room_name: 'Bedroom', temp_sensor_value: 20, desired_temperature: 19, light_gpio_value: 0, hum_sensor_value: 40 },
+            { iroom_idd: 3, room_name: 'Kitchen', temp_sensor_value: 22, desired_temperature: 21, light_gpio_value: 1, hum_sensor_value: 55 }
         ];
 
         function createCard(r) {
             return `
-            <div class="card" id="card-${r.id}">
+            <div class="card" id="card-${r.room_id}">
                 <div class="flex">
-                    <span style="font-weight:bold">${r.name}</span>
-                    <button class="icon-btn" onclick="toggleEx(${r.id})">⚙️</button>
+                    <span style="font-weight:bold">${r.room_name}</span>
+                    <button class="icon-btn" onclick="toggleEx(${r.room_id})">⚙️</button>
                 </div>
                 <div class="flex" style="margin: 15px 0; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 15px;">
                     <span>💡 Light</span>
                     <label class="switch">
-                        <input type="checkbox" ${r.light ? 'checked' : ''} onchange="postLight(${r.id}, this.checked ? 1 : 0)">
+                        <input type="checkbox" ${r.light_gpio_value ? 'checked' : ''} onchange="postLight(${r.room_id}, this.checked ? 1 : 0)">
                         <span class="slider"></span>
                     </label>
                 </div>
-                <div class="temp-box" onmousedown="startDrag(event, ${r.id})" ontouchstart="startDrag(event, ${r.id})">
+                <div class="temp-box" onmousedown="startDrag(event, ${r.room_id})" ontouchstart="startDrag(event, ${r.room_id})">
                     <svg viewBox="0 0 100 50" width="180">
                         <path d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#2d2d44" stroke-width="6" stroke-linecap="round"/>
-                        <path id="prog-${r.id}" d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#8b5cf6" stroke-width="7" stroke-linecap="round" stroke-dasharray="0, 126"/>
+                        <path id="prog-${r.room_id}" d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#8b5cf6" stroke-width="7" stroke-linecap="round" stroke-dasharray="0, 126"/>
                     </svg>
                     <div class="temp-display">
-                        <div class="real-val"><span id="real-${r.id}">${r.temp}</span>°</div>
+                        <div class="real-val"><span id="real-${r.room_id}">${r.temp_sensor_value}</span>°</div>
                         <div class="target-label">Target</div>
-                        <div class="target-val"><span id="set-${r.id}">${r.setpoint}</span>°</div>
+                        <div class="target-val"><span id="set-${r.room_id}">${r.desired_temperature}</span>°</div>
                     </div>
                 </div>
                 <div class="schedule">
@@ -115,7 +115,7 @@
         // Call nucleo code to set light/led
         async function postLight(roomId, value) {
             let path_url = '/api/v1/light';
-            let payload = JSON.stringify({"room_id" : roomId, "light_value" : value});
+            let payload = JSON.stringify({"room_id" : roomId, "light_gpio_value" : value});
             if (roomId == 0 ) {
                 path_url = '/api/v1/led';
                 payload = JSON.stringify({"led_num" : roomId, "led_val" : value});
@@ -132,7 +132,7 @@
         // Call nucleo code to set temperature
         async function postTemp(roomId, value) {
             try {
-                const payload = JSON.stringify({"room_id" : roomId, "temp_val" : value});
+                const payload = JSON.stringify({"room_id" : roomId, "desire_temp_value" : value});
                 await fetch('/api/v1/temp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -183,8 +183,8 @@
 
                 // Update temperature and humidity values
                 if (data.temp_value !== undefined) {
-                    rooms[data.room_id].temp = data.temp_value;
-                    rooms[data.room_id].hum_value = data.hum_value;
+                    rooms[data.room_id].temp_sensor_value = data.temp_value;
+                    rooms[data.room_id].hum_sensor_value = data.hum_value;
                     
                     console.log("TEMP: ", data.temp_value);
                     document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
@@ -193,7 +193,7 @@
                 // Update light/led values
                 if (data.light_value !== undefined) {
 
-                    rooms[data.room_id].light = data.light_value;
+                    rooms[data.room_id].light_gpio_value = data.light_value;
                     const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
                     if (lightCheckbox) {
                         lightCheckbox.checked = data.light_value === 1;

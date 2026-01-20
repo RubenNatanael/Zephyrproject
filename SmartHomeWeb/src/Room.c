@@ -29,6 +29,9 @@ static const struct pwm_dt_spec kr_pwdled = PWM_DT_SPEC_GET(DT_ALIAS(pwmkitchen)
 static const struct gpio_dt_spec lr_gpio_switch = GPIO_DT_SPEC_GET_OR(DT_ALIAS(switchlivingroom), gpios, {0});
 static const struct gpio_dt_spec kr_gpio_switch = GPIO_DT_SPEC_GET_OR(DT_ALIAS(switchkitchen), gpios, {0});
 
+static const struct gpio_dt_spec lr_gpio_relay_tmp = GPIO_DT_SPEC_GET_OR(DT_ALIAS(/*TODO*/), gpios, {0});
+static const struct gpio_dt_spec kr_gpio_relay_tmp = GPIO_DT_SPEC_GET_OR(DT_ALIAS(/*TODO*/), gpios, {0});
+
 /* RTIO devices for reading temperature/humidity channels */
 SENSOR_DT_READ_IODEV(dht_iodev0,
                      DHT0_ALIAS,
@@ -47,17 +50,29 @@ static struct Room lr_room  = {
     .light_switch = &lr_gpio_switch, 
     .light_gpio = &leds[ROOM_LED_ERROR], 
     .light_pwm = NULL, 
-    .light_value = 0,
+    .light_gpio_value = 0,
     .dht_devices = dht_devices[0],
-    .dht_iodevs = &dht_iodev0
+    .dht_iodevs = &dht_iodev0,
+    .temp_sensor_value = 22,
+    .hum_sensor_value = 22,
+    .desired_temperature = 22,
+    .heat_relay = &lr_gpio_relay_tmp,
+    .heat_relay_state = false,
+    .offset_desired_temperature = 50
 };
 static struct Room kr_room = { 
     .light_switch = &kr_gpio_switch, 
     .light_gpio = NULL, 
     .light_pwm = &kr_pwdled, 
-    .light_value = 0,
+    .light_gpio_value = 0,
     .dht_devices = dht_devices[1],
-    .dht_iodevs = &dht_iodev1
+    .dht_iodevs = &dht_iodev1,
+    .temp_sensor_value = 22,
+    .hum_sensor_value = 22,
+    .desired_temperature = 22,
+    .heat_relay = &kr_gpio_relay_tmp,
+    .heat_relay_state = false,
+    .offset_desired_temperature = 50
 };
 
 static struct Room *rooms[STRUCT_ROOM_COUNT] = { 
@@ -75,20 +90,35 @@ bool room_device_init() {
     }
 
     /* PWM signal for leds init */
-    if (!device_is_ready(lr_pwdled.dev) || !device_is_ready(kr_pwdled.dev)) {
-        LOG_ERR("PWM devices not ready");
-        return false;
+    static const struct pwm_dt_spec pwd_lights[] = { lr_pwdled, kr_pwdled };
+    for (size_t i = 0; i < ARRAY_SIZE(pwd_lights); i++) {
+
+        if (!pwm_is_ready_dt(&pwd_lights[i])){
+            LOG_ERR("PWM device not ready");
+            return false;
+        }
     }
 
-
-    /* Switch init */
-    const struct gpio_dt_spec *switches[] = { &lr_gpio_switch, &kr_gpio_switch};
-    int number_of_switches = sizeof(switches) / sizeof(struct gpio_dt_spec*);
+    /* INPUT GPIO init */
+    const struct gpio_dt_spec *input_gpio[] = { &lr_gpio_switch, &kr_gpio_switch};
+    int number_of_switches = sizeof(input_gpio) / sizeof(struct gpio_dt_spec*);
     for (int i = 0; i < number_of_switches; i++) {
-        if (!gpio_is_ready_dt(switches[i])) return 0;
-        ret = gpio_pin_configure_dt(switches[i], GPIO_INPUT | switches[i]->dt_flags);
+        if (!gpio_is_ready_dt(input_gpio[i])) return 0;
+        ret = gpio_pin_configure_dt(input_gpio[i], GPIO_INPUT | input_gpio[i]->dt_flags);
         if (ret != 0) {
-            LOG_ERR("Configuring kit GPIO pin failed: %d", ret);
+            LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
+            return false;
+        }
+    }
+
+    /* OUTPUT GPIO init */
+    const struct gpio_dt_spec *output_gpio[] = { &lr_gpio_relay_tmp, &kr_gpio_relay_tmp};
+    int number_of_switches = sizeof(output_gpio) / sizeof(struct gpio_dt_spec*);
+    for (int i = 0; i < number_of_switches; i++) {
+        if (!gpio_is_ready_dt(output_gpio[i])) return 0;
+        ret = gpio_pin_configure_dt(output_gpio[i], GPIO_OUTPUT | output_gpio[i]->dt_flags);
+        if (ret != 0) {
+            LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
             return false;
         }
     }

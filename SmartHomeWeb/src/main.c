@@ -40,11 +40,11 @@ void listening_switch_events_thread(void) {
 
             bool new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
-            if (new_state != rooms[i]->light_value) {
+            if (new_state != rooms[i]->light_gpio_value) {
                 // In case is a PWM event light needs special value so I calculated it here
                 new_state = rooms[i]->light_pwm->period * percentage_ / 100;
                 register_new_event(rooms[i], new_state, true);
-                rooms[i]->light_value = new_state;
+                rooms[i]->light_gpio_value = new_state;
             }
         }
 
@@ -65,13 +65,20 @@ void listening_tmp_events_thread(void) {
             uint32_t hum_value = 0;
             read_temp_and_hum(rooms[i], &temp_value, &hum_value);
 
-            if (temp_value != rooms[i]->last_temp_value ||
-                hum_value != rooms[i]->last_hum_value) {
+            if (temp_value != rooms[i]->temp_sensor_value ||
+                hum_value != rooms[i]->hum_sensor_value) {
                 LOG_DBG("New temp/hum event in room %d: %d/%d", rooms[i]->room_id, temp_value, hum_value);
-                LOG_DBG("Old temp/hum event in room %d: %d/%d", rooms[i]->room_id, rooms[i]->last_temp_value, rooms[i]->last_hum_value);
+                LOG_DBG("Old temp/hum event in room %d: %d/%d", rooms[i]->room_id, rooms[i]->temp_sensor_value, rooms[i]->hum_sensor_value);
                 register_new_temp_hum_event(rooms[i], temp_value, hum_value, true);
-                rooms[i]->last_temp_value = temp_value;
-                rooms[i]->last_hum_value = hum_value;
+                rooms[i]->temp_sensor_value = temp_value;
+                rooms[i]->hum_sensor_value = hum_value;
+            }
+            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature / 100) {
+                register_new_event(rooms[i], 1, false);
+                rooms[i]->heat_relay_state = true;
+            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature / 100) {
+                register_new_event(rooms[i], 0, false);
+                rooms[i]->heat_relay_state = false;
             }
         }
 

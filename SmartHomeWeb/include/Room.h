@@ -60,20 +60,29 @@ struct Room {
     const uint8_t room_id;
     const char* room_name;
 
-    /* Light */
+/* Light */
     /* Switch can toggle pwm device or gpio*/
-    const struct gpio_dt_spec* light_switch;
-    const struct pwm_dt_spec* light_pwm;
-    const struct gpio_dt_spec* light_gpio;
-    uint16_t light_value;
+    const struct gpio_dt_spec* light_switch;   // INPUT
+    const struct pwm_dt_spec* light_pwm;       // OUTPUT PWM
+    const struct gpio_dt_spec* light_gpio;     // OUTPUT GPIO
+    uint16_t light_gpio_value;                 // Current GPIO value
 
-    /* TODO Heat */
-    const struct device *const dht_devices;
-    struct rtio_iodev *const dht_iodevs;
-    uint32_t last_temp_value;
-    uint32_t last_hum_value;
-    /* Temperature sensor */
-    /* Temperature gpio */
+/* Heat */
+    /* Sensor and RTIO IODEV for DHT22 */
+    const struct device *const dht_devices;    // INPUT DHT device
+    struct rtio_iodev *const dht_iodevs;       // RTIO IODEV for DHT
+    uint32_t temp_sensor_value;                // Last read temperature
+    uint32_t hum_sensor_value;                 // Last read humidity
+    /* Actuators */
+    const struct gpio_dt_spec* heat_relay;     // OUTPUT HEAT relay GPIO
+    bool heat_relay_state;                     // OUTPUT HEAT relay state
+    uint32_t desired_temperature;              // Desired temperature
+
+    uint32_t offset_desired_temperature;       // Offset for desired temperature
+                                               // VALUES: 25  - 0.25 C
+                                               //         50  - 0.50 C
+                                               //         75  - 0.75 C
+                                               //         100 - 1.00 C
 };
 
 void gpio_event_action(void *ctx, uint16_t value);

@@ -10,6 +10,8 @@
 
 #include "Room.h"
 
+#define MAX_ROOMS 5
+
 LOG_MODULE_REGISTER(web_server, LOG_LEVEL_DBG);
 static uint16_t ui_port = 80;
 
@@ -20,11 +22,11 @@ static const uint8_t index_html[] = {
 /* JSON commands definition */
 struct led_command {
 	int led_num;
-	int led_val;
+	bool led_val;
 };
 static const struct json_obj_descr led_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct led_command, led_num, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct led_command, led_val, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct led_command, led_val, JSON_TOK_TRUE),
 };
 
 struct room_light_command {
@@ -43,31 +45,56 @@ struct room_temp_read_command {
 	int temp_value;
 	int hum_value;
 };
+
 static const struct json_obj_descr room_temp_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, temp_value, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_temp_read_command, hum_value, JSON_TOK_NUMBER),
 };
 
+// JSON commands for temperature setting
 struct room_temp_set_command {
 	int room_id;
-	int temp_value;
+	int desire_temp_value;
 };
 static const struct json_obj_descr room_temp_set_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, room_id, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, temp_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, desire_temp_value, JSON_TOK_NUMBER),
+};
+struct RoomCollection {
+    struct Room **rooms;
+    size_t num_rooms;
 };
 
 static const struct json_obj_descr room_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct Room, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct Room, room_name, JSON_TOK_STRING),
-	JSON_OBJ_DESCR_PRIM(struct Room, last_temp_value, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, last_hum_value, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct Room, light_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, temp_sensor_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, hum_sensor_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, light_gpio_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, desired_temperature, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct Room, heat_relay_state, JSON_TOK_TRUE),
+
+};
+static const struct json_obj_descr room_array_descr[] = {
+    JSON_OBJ_DESCR_OBJ_ARRAY(struct RoomCollection, rooms, 10, 
+                             num_rooms, room_command_descr, ARRAY_SIZE(room_command_descr)),
+};
+
+/* End JOSN conf */
+
+static void http_response(struct http_response_ctx *response_ctx, uint16_t status_code,
+		   const void *data, size_t data_len,
+		   bool final_chunk)
+{
+	response_ctx->status = status_code;
+	response_ctx->body = data;
+	response_ctx->body_len = data_len;
+	response_ctx->final_chunk = final_chunk;
 }
 
+/* Polymorphic function pointer for POST parser functions */
 typedef void (*post_parser_fn)(uint8_t *buf, size_t len);
-
 struct post_state {
 	uint8_t *buf;
 	size_t cursor;
@@ -129,35 +156,14 @@ static void parse_temp_post(uint8_t *buf, size_t len)
 		return;
 	}
 
-	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.temp_value);
+	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.desire_temp_value);
 
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
-		register_new_temp_hum_event(room, cmd.temp_value, room->last_hum_value, true);
+		room->desired_temperature = cmd.desire_temp_value;
 	}
 }
 
-static int rooms_get_handler(struct http_client_ctx *client, enum http_data_status status,
-		       const struct http_request_ctx *request_ctx,
-		       struct http_response_ctx *response_ctx, void *user_data)
-{
-	if (status == HTTP_SERVER_DATA_FINAL) {
-		struct Room **all_rooms = get_all_rooms();
-		uint8_t response_buf[512];
-		size_t num_rooms = get_room_count();
-		int ret;
-
-		ret = json_arr_encode_buf(room_descr, ARRAY_SIZE(room_descr), rooms, num_rooms, response_buf, sizeof(response_buf));
-		if (ret < 0) {
-			LOG_ERR("Failed to encode JSON: %d", ret);
-			http_response(client, HTTP_STATUS_INTERNAL_SERVER_ERROR, NULL, 0, NULL);
-			return -1;
-		}
-
-		http_response(client, HTTP_STATUS_OK, response_buf, ret, NULL);
-	}
-	return 0;
-}
 static struct post_state led_post_state = {
 	.buf = NULL,
 	.cursor = 0,
@@ -199,7 +205,7 @@ static int post_handler(struct http_client_ctx *client, enum http_data_status st
 	}
 
 	if (state->buf == NULL) {
-        state->buf = (uint8_t *)k_malloc(state->max_size);
+        state->buf = (uint8_t *)k_malloc(state->max_size + 1);
         if (!state->buf) {
             LOG_ERR("Out of memory for POST buffer");
             return -ENOMEM;
@@ -230,7 +236,42 @@ static int post_handler(struct http_client_ctx *client, enum http_data_status st
 
 	return 0;
 }
+/* End Poly. POST */
 
+/* Handler for GET */
+static int rooms_get_handler(struct http_client_ctx *client, enum http_data_status status,
+		       const struct http_request_ctx *request_ctx,
+		       struct http_response_ctx *response_ctx, void *user_data)
+{
+	if (status == HTTP_SERVER_DATA_FINAL) {
+
+		char json_buf[512];
+
+		struct RoomCollection collection = {
+			.rooms = get_all_rooms(),
+			.num_rooms = STRUCT_ROOM_COUNT
+		};
+
+		int ret = json_arr_encode_buf(
+			room_array_descr,
+			&collection,
+			json_buf,
+			sizeof(json_buf)
+		);
+
+		if (ret < 0) {
+			LOG_ERR("Failed to encode JSON: %d", ret);
+			http_response(response_ctx, 500, NULL, 0, true);
+			return -1;
+		}
+
+		size_t json_len = strlen(json_buf);
+		http_response(response_ctx, 200, json_buf, json_len, true);
+	}
+	return 0;
+}
+
+/* HTTP resource definitions */
 static struct http_resource_detail_static index_detail = {
     .common = {
         .type = HTTP_RESOURCE_TYPE_STATIC,
@@ -277,9 +318,9 @@ static struct http_resource_detail_dynamic room_command_detail = {
 	.cb = rooms_get_handler,
 	.user_data = NULL,
 };
+/* END HTTP resource definitions */
 
-/* START WEB sockets */
-
+/* WEB sockets */
 #define MAX_WS_CLIENTS 5
 static int ws_clients[MAX_WS_CLIENTS] = {0};
 static uint8_t number_of_clients_connected = 0;
@@ -330,9 +371,6 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
         }
 
         LOG_DBG("Sending data");
-
-		
-		
 		LOG_DBG("Web event: room %d, type %d, value %d",
 				new_web_event->room_id,
 				new_web_event->value_type,
@@ -352,28 +390,18 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 											sizeof(ws_tx_buffer));
 				break;
 			}
-			case HEAT_EV: {
+			case HEAT_EV:
+			case HUM_EV: {
+				struct Room *r = get_room_by_id(new_web_event->room_id);
 				struct room_temp_read_command room_data;
 				room_data.room_id = new_web_event->room_id;
-				room_data.temp_value = new_web_event->value;
-				room_data.hum_value = room_data.hum_value; // Keep previous hum value
+				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->value : (r ? r->temp_sensor_value : 0);
+    			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->value : (r ? r->hum_sensor_value : 0);
 				ret = json_obj_encode_buf(room_temp_command_descr,
 												ARRAY_SIZE(room_temp_command_descr),
 												&room_data,
 												ws_tx_buffer,
 												sizeof(ws_tx_buffer));
-				break;
-			}
-			case HUM_EV: {
-				struct room_temp_read_command room_hum_data;
-				room_hum_data.room_id = new_web_event->room_id;
-				room_hum_data.temp_value = room_hum_data.temp_value; // Keep previous temp value
-				room_hum_data.hum_value = new_web_event->value;
-				ret = json_obj_encode_buf(room_temp_command_descr,
-											ARRAY_SIZE(room_temp_command_descr),
-											&room_hum_data,
-											ws_tx_buffer,
-											sizeof(ws_tx_buffer));
 				break;
 			}
 			default:
@@ -440,7 +468,7 @@ struct http_resource_detail_websocket ws_resource_detail = {
 
 /* END WEB sockets*/
 
-HTTP_SERVICE_DEFINE(test_http_service, NULL, &ui_port, 5, 10, NULL, NULL, NULL);
+HTTP_SERVICE_DEFINE(test_http_service, NULL, &ui_port, 4, 10, NULL, NULL, NULL);
 
 HTTP_RESOURCE_DEFINE(index_res, test_http_service, "/", &index_detail);
 
