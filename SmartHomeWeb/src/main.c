@@ -60,20 +60,21 @@ void listening_tmp_events_thread(void) {
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
 
-            uint32_t temp_value = 0;
-            uint32_t hum_value = 0;
-            read_temp_and_hum(rooms[i], &temp_value, &hum_value);
+            uint32_t temp_scaled_value = 0;
+            uint32_t hum_scaled_value = 0;
+            read_temp_and_hum(rooms[i], &temp_scaled_value, &hum_scaled_value);
 
-            if (temp_value != rooms[i]->temp_sensor_value ||
-                hum_value != rooms[i]->hum_sensor_value) {
-                register_new_temp_hum_event(rooms[i], temp_value, hum_value, true);
-                rooms[i]->temp_sensor_value = temp_value;
-                rooms[i]->hum_sensor_value = hum_value;
+            if (temp_scaled_value != rooms[i]->temp_sensor_value ||
+                hum_scaled_value != rooms[i]->hum_sensor_value) {
+                register_new_temp_hum_event(rooms[i], temp_scaled_value, hum_scaled_value, true);
+                rooms[i]->temp_sensor_value = temp_scaled_value;
+                rooms[i]->hum_sensor_value = hum_scaled_value;
             }
-            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature / 100) {
+            
+            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature) {
                 register_new_event(rooms[i], 1, false);
                 rooms[i]->heat_relay_state = true;
-            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature / 100) {
+            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature) {
                 register_new_event(rooms[i], 0, false);
                 rooms[i]->heat_relay_state = false;
             }

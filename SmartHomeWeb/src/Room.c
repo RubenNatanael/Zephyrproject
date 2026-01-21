@@ -55,9 +55,9 @@ static struct Room lr_room  = {
     .light_gpio_value = 0,
     .dht_devices = dht_devices[0],
     .dht_iodevs = &dht_iodev0,
-    .temp_sensor_value = 22,
-    .hum_sensor_value = 22,
-    .desired_temperature = 22,
+    .temp_sensor_value = 2200,
+    .hum_sensor_value = 2200,
+    .desired_temperature = 2200,
     .heat_relay = &lr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50
@@ -71,9 +71,9 @@ static struct Room kr_room = {
     .light_gpio_value = 0,
     .dht_devices = dht_devices[1],
     .dht_iodevs = &dht_iodev1,
-    .temp_sensor_value = 22,
-    .hum_sensor_value = 22,
-    .desired_temperature = 22,
+    .temp_sensor_value = 2200,
+    .hum_sensor_value = 2200,
+    .desired_temperature = 2200,
     .heat_relay = &kr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50
@@ -242,50 +242,48 @@ bool register_new_temp_hum_event(struct Room *room, uint32_t temp_value, uint32_
 }
 
 // For testing purposes only, simulating temperature and humidity readings
-static int x = 4;
-int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit) {
+static int x = 400;
 
-    *temp_fit = 20 + x -1;
-    *hum_fit = 20  + x;
+
+int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled) {
+
+    x = x + 100;
+    *temp_scaled = 2000 + x ;
+    *hum_scaled = 2000  + x - 100;
     x++;
     return 0;
 
     int rc;
-
+    uint8_t buf[128];
     struct device *dev = (struct device *) room->dht_devices;
 
-    uint8_t buf[128];
-
-    rc = sensor_read(room->dht_iodevs, &dht_ctx, buf, 128);
-
-    if (rc != 0) {
-        LOG_WRN("%s: sensor_read() failed: %d\n", dev->name, rc);
-        return rc;
-    }
+    rc = sensor_read(room->dht_iodevs, &dht_ctx, buf, sizeof(buf));
+    if (rc != 0) return rc;
 
     const struct sensor_decoder_api *decoder;
+    sensor_get_decoder(dev, &decoder);
 
-    rc = sensor_get_decoder(dev, &decoder);
-
-    if (rc != 0) {
-        LOG_WRN("%s: sensor_get_decode() failed: %d\n", dev->name, rc);
-        return rc;
+    // Decode Temp
+    uint32_t fit = 0;
+    struct sensor_q31_data q_data = {0};
+    
+    // Process Temperature
+    decoder->decode(buf, (struct sensor_chan_spec){SENSOR_CHAN_AMBIENT_TEMP, 0}, &fit, 1, &q_data);
+    if (fit > 0) {
+        q31_t q = q_data.readings[0].temperature;
+        int32_t whole = q >> q_data.shift;
+        int32_t frac  = ((q & ((1LL << q_data.shift) - 1)) * 100) >> q_data.shift;
+        temp_scaled = (whole * 100) + frac;
     }
 
-    *temp_fit = 0;
-    struct sensor_q31_data temp_data = {0};
+    // Process Humidity
+    decoder->decode(buf, (struct sensor_chan_spec){SENSOR_CHAN_HUMIDITY, 0}, &fit, 1, &q_data);
+    if (fit > 0) {
+        q31_t q = q_data.readings[0].humidity;
+        int32_t whole = q >> q_data.shift;
+        int32_t frac  = ((q & ((1LL << q_data.shift) - 1)) * 100) >> q_data.shift;
+        hum_scaled = (whole * 100) + frac;
+    }
 
-    decoder->decode(buf,
-            (struct sensor_chan_spec) {SENSOR_CHAN_AMBIENT_TEMP, 0},
-            temp_fit, 1, &temp_data);
-
-    *hum_fit = 0;
-    struct sensor_q31_data hum_data = {0};
-
-    decoder->decode(buf,
-            (struct sensor_chan_spec) {SENSOR_CHAN_HUMIDITY, 0},
-            hum_fit, 1, &hum_data);
     return 0;
 }
-
-

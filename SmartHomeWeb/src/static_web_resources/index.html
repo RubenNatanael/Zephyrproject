@@ -1,3 +1,5 @@
+<!-- VERY IMPORTANT!!!!!! - all temperature values must be send to backend with a scale of 100!!!(ex. 20.5 -> 2050)-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,10 +52,10 @@
     <script>
         // "temp" is what the sensor reads. "setpoint" is what the user wants.
         const rooms = [
-            { room_id: 0, room_name: 'Test Room', temp_sensor_value: 24, desired_temperature: 22, light_gpio_value: 1, hum_sensor_value: 50 },
-            { room_id: 1, room_name: 'Living Room', temp_sensor_value: 24, desired_temperature: 22, light_gpio_value: 1, hum_sensor_value: 45 },
-            { room_id: 2, room_name: 'Bedroom', temp_sensor_value: 20, desired_temperature: 19, light_gpio_value: 0, hum_sensor_value: 40 },
-            { iroom_idd: 3, room_name: 'Kitchen', temp_sensor_value: 22, desired_temperature: 21, light_gpio_value: 1, hum_sensor_value: 55 }
+            { room_id: 0, room_name: 'Test Room', temp_sensor_value: 2400, desired_temperature: 2200, light_gpio_value: 1, hum_sensor_value: 50 },
+            { room_id: 1, room_name: 'Living Room', temp_sensor_value: 2400, desired_temperature: 2200, light_gpio_value: 1, hum_sensor_value: 45 },
+            { room_id: 2, room_name: 'Bedroom', temp_sensor_value: 2000, desired_temperature: 1900, light_gpio_value: 0, hum_sensor_value: 40 },
+            { iroom_idd: 3, room_name: 'Kitchen', temp_sensor_value: 2200, desired_temperature: 2100, light_gpio_value: 1, hum_sensor_value: 55 }
         ];
 
         function createCard(r) {
@@ -76,9 +78,9 @@
                         <path id="prog-${r.room_id}" d="M 10,45 A 40,40 0 0,1 90,45" fill="none" stroke="#8b5cf6" stroke-width="7" stroke-linecap="round" stroke-dasharray="0, 126"/>
                     </svg>
                     <div class="temp-display">
-                        <div class="real-val"><span id="real-${r.room_id}">${r.temp_sensor_value}</span>°</div>
+                        <div class="real-val"><span id="real-${r.room_id}">${r.temp_sensor_value / 100}</span>°</div>
                         <div class="target-label">Target</div>
-                        <div class="target-val"><span id="set-${r.room_id}">${r.desired_temperature}</span>°</div>
+                        <div class="target-val"><span id="set-${r.room_id}">${r.desired_temperature / 100}</span>°</div>
                     </div>
                 </div>
                 <div class="schedule">
@@ -97,7 +99,7 @@
         
         window.onmouseup = window.ontouchend = () => { 
             if(dragging) {
-                const targetTemp = parseInt(document.getElementById(`set-${activeId}`).innerText);
+                const targetTemp = parseInt(parseFloat(document.getElementById(`set-${activeId}`).innerText) * 100);
                 postTemp(activeId, targetTemp);
             }
             dragging = false; 
@@ -107,8 +109,8 @@
             const box = document.querySelector(`#card-${activeId} .temp-box`);
             const rect = box.getBoundingClientRect();
             let p = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
-            let t = Math.round(16 + (p * 14)); // Range 16-30
-            document.getElementById(`set-${activeId}`).innerText = t;
+            let t =  Math.round((1000 + (p * 1800)) / 10) * 10;
+            document.getElementById(`set-${activeId}`).innerText =  t / 100;
             document.getElementById(`prog-${activeId}`).style.strokeDasharray = `${p * 126}, 126`;
         }
 
@@ -179,8 +181,8 @@
 
         //         // Update temperature and humidity values
         //         if (data.temp_value !== undefined) {
-        //             rooms[data.room_id].temp_sensor_value = data.temp_value;
-        //             rooms[data.room_id].hum_sensor_value = data.hum_value;
+        //             rooms[data.room_id].temp_sensor_value = data.temp_value * 100;
+        //             rooms[data.room_id].hum_sensor_value = data.hum_value * 100;
                     
         //             console.log("TEMP: ", data.temp_value);
         //             document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
@@ -253,11 +255,14 @@
                     const data = JSON.parse(event.data.trim());
                     
                     if (data.temp_value !== undefined) {
-                        document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
-                        log(`Room ${data.room_id} Update: ${data.temp_value}°C`, "#8b5cf6");
+                        rooms[data.room_id].temp_sensor_value = data.temp_value;
+                        rooms[data.room_id].hum_sensor_value = data.hum_value;
+                        document.getElementById(`real-${data.room_id}`).textContent = rooms[data.room_id].temp_sensor_value / 100;
+                        log(`Room ${data.room_id} Update: ${rooms[data.room_id].temp_sensor_value / 100}°C`, "#8b5cf6");
                     }
 
                     if (data.light_value !== undefined) {
+                        rooms[data.room_id].light_gpio_value = data.light_value;
                         const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
                         if (lightCheckbox) lightCheckbox.checked = data.light_value === 1;
                     }
