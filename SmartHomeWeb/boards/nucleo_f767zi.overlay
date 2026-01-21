@@ -1,7 +1,14 @@
 / {
     aliases {
+
+        // OUTPUTS
         pwmlivingroom = &pwm_0;
         pwmkitchen = &pwm_1;
+    
+        temprelaylivingroom = &temp_relay_livingroom;
+        temprelaykitchen = &temp_relay_kitchen;
+
+        // INPUTS
         switchlivingroom = &switch_livingroom;
         switchkitchen = &switch_kitchen;
 
@@ -39,6 +46,22 @@
             status = "okay";
         };
     };
+
+    relay {
+        compatible = "gpio-keys";
+
+        temp_relay_livingroom: relay1 {
+            label = "Living Room Temp. relay";
+            gpios = < &gpiod 0xe GPIO_ACTIVE_HIGH >;
+            status = "okay";
+        };
+
+        temp_relay_kitchen: relay2 {
+            label = "Kitchen Temp. relay";
+            gpios = < &gpiod 0xf GPIO_ACTIVE_HIGH >;
+            status = "okay";
+        };
+    };
     
 };
 
@@ -58,13 +81,13 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 	};
-	tempS2: hs300x@4A {
+	tempS2: hs300x@4a {
 		compatible = "renesas,hs300x";
 		reg = <0x4a>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 	};
-	tempS3: hs300x@4B {
+	tempS3: hs300x@4b {
 		compatible = "renesas,hs300x";
 		reg = <0x4b>;
 		#address-cells = <1>;

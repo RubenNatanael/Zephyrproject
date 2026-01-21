@@ -57,7 +57,6 @@ void listening_tmp_events_thread(void) {
     struct Room **rooms = get_all_rooms();
 
     while (1) {
-        int percentage_ = 50;
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
 
