@@ -104,7 +104,7 @@ static void http_response(struct http_response_ctx *response_ctx, uint16_t statu
 }
 
 /* Polymorphic function pointer for POST parser functions */
-typedef void (*post_parser_fn)(uint8_t *buf, size_t len);
+typedef bool (*post_parser_fn)(uint8_t *buf, size_t len);
 struct post_state {
 	uint8_t *buf;
 	size_t cursor;
@@ -112,7 +112,7 @@ struct post_state {
 	post_parser_fn parser;
 };
 
-static void parse_led_post(uint8_t *buf, size_t len)
+static bool parse_led_post(uint8_t *buf, size_t len)
 {
 	int ret;
 	struct led_command cmd;
@@ -122,17 +122,18 @@ static void parse_led_post(uint8_t *buf, size_t len)
 	ret = json_obj_parse(buf, len, led_command_descr, ARRAY_SIZE(led_command_descr), &cmd);
 	if (ret != expected_return_code) {
 		LOG_WRN("Failed to fully parse JSON payload, ret=%d", ret);
-		return;
+		return false;
 	}
 
 	LOG_INF("POST request setting LED %d to state %d", cmd.led_num, cmd.led_val);
 
-    const struct gpio_dt_spec *gpio = get_led_by_id(ROOM_LED_INFO);
+    const struct gpio_dt_spec *gpio = get_led_by_id(cmd.led_num);
 
     gpio_pin_set(gpio->port, gpio->pin, cmd.led_val);
+	return true;
 }
 
-static void parse_room_light_post(uint8_t *buf, size_t len)
+static bool parse_room_light_post(uint8_t *buf, size_t len)
 {
 	int ret;
 	struct room_light_command cmd;
@@ -142,7 +143,7 @@ static void parse_room_light_post(uint8_t *buf, size_t len)
 	ret = json_obj_parse(buf, len, room_light_command_descr, ARRAY_SIZE(room_light_command_descr), &cmd);
 	if (ret != expected_return_code) {
 		LOG_WRN("Failed to fully parse JSON payload, ret=%d", ret);
-		return;
+		return false;
 	}
 
 	LOG_INF("POST request setting LIGHT %d to state %d", cmd.room_id, cmd.light_value);
@@ -150,10 +151,12 @@ static void parse_room_light_post(uint8_t *buf, size_t len)
     struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
         register_new_event(room, cmd.light_value, true);
+		return true;
 	}
+	return false;
 }
 
-static void parse_temp_post(uint8_t *buf, size_t len)
+static bool parse_temp_post(uint8_t *buf, size_t len)
 {
 	int ret;
 	struct room_temp_set_command cmd;
@@ -163,7 +166,7 @@ static void parse_temp_post(uint8_t *buf, size_t len)
 	ret = json_obj_parse(buf, len, room_temp_set_command_descr, ARRAY_SIZE(room_temp_set_command_descr), &cmd);
 	if (ret != expected_return_code) {
 		LOG_WRN("Failed to fully parse JSON payload, ret=%d", ret);
-		return;
+		return false;
 	}
 
 	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.desire_temp_value);
@@ -171,7 +174,9 @@ static void parse_temp_post(uint8_t *buf, size_t len)
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
 		room->desired_temperature = cmd.desire_temp_value;
+		return true;
 	}
+	return false;
 }
 
 static struct post_state led_post_state = {
@@ -238,7 +243,11 @@ static int post_handler(struct http_client_ctx *client, enum http_data_status st
 	state->cursor += request_ctx->data_len;
 
 	if (status == HTTP_SERVER_DATA_FINAL) {
-		state->parser(state->buf, state->cursor);
+		if (state->parser(state->buf, state->cursor)) {
+			http_response(response_ctx, 200, NULL, 0, true);
+		} else {
+			http_response(response_ctx, 400, NULL, 0, true);
+		}
 		k_free(state->buf);
 		state->buf = NULL;
 		state->cursor = 0;

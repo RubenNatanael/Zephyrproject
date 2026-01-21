@@ -116,10 +116,6 @@
         async function postLight(roomId, value) {
             let path_url = '/api/v1/light';
             let payload = JSON.stringify({"room_id" : roomId, "light_gpio_value" : value});
-            if (roomId == 0 ) {
-                path_url = '/api/v1/led';
-                payload = JSON.stringify({"led_num" : roomId, "led_val" : value});
-            }
             try {
                 await fetch(path_url, {
                     method: 'POST',
@@ -170,47 +166,114 @@
         // Fetch rooms dynamically when the page loads
         window.addEventListener('DOMContentLoaded', fetchRooms);
 
-        // Is not calling back to nucleo, just receiving updates
-        window.addEventListener("DOMContentLoaded", (ev) => {
-            const ws = new WebSocket(`/ws`);
+        // // Is not calling back to nucleo, just receiving updates
+        // window.addEventListener("DOMContentLoaded", (ev) => {
+        //     const ws = new WebSocket(`/ws`);
+        //     ws.onopen = () => {
+        //         console.log("Connected to Zephyr WebSocket");
+        //     };
+
+        //     ws.onmessage = (event) => {
+        //         const data = JSON.parse(event.data);
+        //         console.log("Received JSON:", data);
+
+        //         // Update temperature and humidity values
+        //         if (data.temp_value !== undefined) {
+        //             rooms[data.room_id].temp_sensor_value = data.temp_value;
+        //             rooms[data.room_id].hum_sensor_value = data.hum_value;
+                    
+        //             console.log("TEMP: ", data.temp_value);
+        //             document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
+        //         }
+
+        //         // Update light/led values
+        //         if (data.light_value !== undefined) {
+
+        //             rooms[data.room_id].light_gpio_value = data.light_value;
+        //             const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
+        //             if (lightCheckbox) {
+        //                 lightCheckbox.checked = data.light_value === 1;
+        //             }
+        //             console.log(`Room ${data.room_id} light is now: ${data.light_value}`);
+        //         }
+        //     };
+
+        //     ws.onclose = () => {
+        //         console.log("WebSocket disconnected");
+        //     };
+
+        //     ws.onerror = (err) => {
+        //         alert("WebSocket Error Detected!");
+        //         console.error("WebSocket error:", err);
+        //     };
+        // })
+
+
+        // For testing on phones, to be removed later
+         // --- LOGGING UTILITY FOR IPHONE ---
+        const log = (msg, color = "white") => {
+            const debugDiv = document.getElementById('debug-console');
+            if (!debugDiv) return;
+            const entry = document.createElement('div');
+            entry.style.color = color;
+            entry.style.borderBottom = "1px solid #333";
+            entry.style.padding = "2px";
+            entry.innerText = `> ${msg}`;
+            debugDiv.prepend(entry); // Newest logs at the top
+        };
+
+        // Error catching for general JS errors
+        window.onerror = (m, u, l) => log(`JS ERR: ${m} (line ${l})`, "#ff4444");
+
+        window.addEventListener("DOMContentLoaded", () => {
+            // 1. Create the UI for the Debug Console
+            const consoleDiv = document.createElement('div');
+            consoleDiv.id = 'debug-console';
+            consoleDiv.style = "position:fixed; bottom:0; left:0; width:100%; height:150px; background:rgba(0,0,0,0.9); color:#0f0; font-family:monospace; font-size:10px; overflow-y:auto; z-index:10000; border-top:2px solid #8b5cf6; padding:5px; pointer-events:none;";
+            document.body.appendChild(consoleDiv);
+
+            log("Initializing WebSocket...", "#8b5cf6");
+
+            // 2. Use Dynamic URL (Works on iPhone & PC)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            log(`Connecting to: ${wsUrl}`);
+
+            const ws = new WebSocket(wsUrl);
+
             ws.onopen = () => {
-                console.log("Connected to Zephyr WebSocket");
+                log("CONNECTED TO NUCLEO ✅", "#2ecc71");
             };
 
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                console.log("Received JSON:", data);
-
-                // Update temperature and humidity values
-                if (data.temp_value !== undefined) {
-                    rooms[data.room_id].temp_sensor_value = data.temp_value;
-                    rooms[data.room_id].hum_sensor_value = data.hum_value;
+                try {
+                    // Log raw data to see if iPhone is actually getting bytes
+                    log(`Raw: ${event.data.substring(0, 30)}...`, "#aaa");
                     
-                    console.log("TEMP: ", data.temp_value);
-                    document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
-                }
-
-                // Update light/led values
-                if (data.light_value !== undefined) {
-
-                    rooms[data.room_id].light_gpio_value = data.light_value;
-                    const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
-                    if (lightCheckbox) {
-                        lightCheckbox.checked = data.light_value === 1;
+                    const data = JSON.parse(event.data.trim());
+                    
+                    if (data.temp_value !== undefined) {
+                        document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
+                        log(`Room ${data.room_id} Update: ${data.temp_value}°C`, "#8b5cf6");
                     }
-                    console.log(`Room ${data.room_id} light is now: ${data.light_value}`);
+
+                    if (data.light_value !== undefined) {
+                        const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
+                        if (lightCheckbox) lightCheckbox.checked = data.light_value === 1;
+                    }
+                } catch (e) {
+                    log(`JSON ERROR: ${e.message}`, "#ff4444");
                 }
             };
 
-            ws.onclose = () => {
-                console.log("WebSocket disconnected");
+            ws.onclose = (e) => {
+                log(`DISCONNECTED ❌ (Code: ${e.code})`, "#ff4444");
             };
 
             ws.onerror = (err) => {
-                alert("WebSocket Error Detected!");
-                console.error("WebSocket error:", err);
+                log("WEBSOCKET ERROR DETECTED", "#ff4444");
             };
-        })
+        });
     </script>
 </body>
 </html>
