@@ -90,34 +90,66 @@
             </div>`;
         }
 
-        let dragging = false, activeId = null;
-
-        function toggleEx(id) { document.getElementById(`card-${id}`).classList.toggle('expanded'); }
-        function startDrag(e, id) { dragging = true; activeId = id; update(e); }
+        let dragging = false;
         
         window.onmousemove = window.ontouchmove = (e) => { if(dragging) update(e.touches ? e.touches[0] : e); };
         
-        window.onmouseup = window.ontouchend = () => { 
-            if(dragging) {
-                const targetTemp = parseInt(parseFloat(document.getElementById(`set-${activeId}`).innerText) * 100);
-                postTemp(activeId, targetTemp);
+        function startDrag(e, roomId) {
+            dragging = true;
+            activeId = roomId;
+            update(e.touches ? e.touches[0] : e);
+        }
+
+        window.onmouseup = window.ontouchend = () => {
+            if (dragging) {
+                const room = rooms.find(r => r.room_id === activeId);
+                if (room) postTemp(activeId, room.desired_temperature);
             }
-            dragging = false; 
+            dragging = false;
         };
+
+        const TEMP_MIN = 1000; // 10.00°C
+        const TEMP_MAX = 2800; // 28.00°C
+        const ARC_LEN  = 126;
+
+        function updateSetpoint(roomId, value100) {
+            // Clamp
+            value100 = Math.max(TEMP_MIN, Math.min(TEMP_MAX, value100));
+
+            // Update state
+            const room = rooms.find(r => r.room_id === roomId);
+            if (room) room.desired_temperature = value100;
+
+            // UI text
+            const setEl = document.getElementById(`set-${roomId}`);
+            if (setEl) setEl.innerText = (value100 / 100).toFixed(1);
+
+            // Progress arc
+            const p = (value100 - TEMP_MIN) / (TEMP_MAX - TEMP_MIN);
+            const prog = document.getElementById(`prog-${roomId}`);
+            if (prog) prog.style.strokeDasharray = `${p * ARC_LEN}, ${ARC_LEN}`;
+        }
+
 
         function update(e) {
             const box = document.querySelector(`#card-${activeId} .temp-box`);
             const rect = box.getBoundingClientRect();
-            let p = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
-            let t =  Math.round((1000 + (p * 1800)) / 10) * 10;
-            document.getElementById(`set-${activeId}`).innerText =  t / 100;
-            document.getElementById(`prog-${activeId}`).style.strokeDasharray = `${p * 126}, 126`;
+
+            const p = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+
+            // Convert slider → temperature (×100)
+            const value100 = Math.round(
+                (TEMP_MIN + p * (TEMP_MAX - TEMP_MIN)) / 10
+            ) * 10;
+
+            updateSetpoint(activeId, value100);
         }
+
 
         // Call nucleo code to set light/led
         async function postLight(roomId, value) {
             let path_url = '/api/v1/light';
-            let payload = JSON.stringify({"room_id" : roomId, "light_gpio_value" : value});
+            let payload = JSON.stringify({"room_id" : roomId, "light_value" : value});
             try {
                 await fetch(path_url, {
                     method: 'POST',
@@ -130,7 +162,7 @@
         // Call nucleo code to set temperature
         async function postTemp(roomId, value) {
             try {
-                const payload = JSON.stringify({"room_id" : roomId, "desire_temp_value" : value});
+                const payload = JSON.stringify({"room_id" : roomId, "setpoint_temp_value" : value});
                 await fetch('/api/v1/temp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -158,6 +190,7 @@
                 rooms.forEach(r => {
                     let p = (r.desired_temperature - 16) / 14;
                     document.getElementById(`prog-${r.room_id}`).style.strokeDasharray = `${p * 126}, 126`;
+                    updateSetpoint(r.room_id, r.desired_temperature);
                 });
             } catch (error) {
                 console.error('Error fetching rooms:', error);
@@ -266,14 +299,30 @@
                         const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
                         if (lightCheckbox) lightCheckbox.checked = data.light_value === 1;
                     }
+
+                    if (data.setpoint_temp_value !== undefined) {
+                        rooms[data.room_id].desired_temperature = data.setpoint_temp_value;
+                        updateSetpoint(data.room_id, data.setpoint_temp_value);
+                        log(`Room ${data.room_id} Setpoint Update: ${data.setpoint_temp_value / 100}°C`, "#8b5cf6");
+                    }
+
                 } catch (e) {
                     log(`JSON ERROR: ${e.message}`, "#ff4444");
                 }
             };
 
             ws.onclose = (e) => {
-                log(`DISCONNECTED ❌ (Code: ${e.code})`, "#ff4444");
-            };
+            const states = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
+            const currentState = states[ws.readyState] || "UNKNOWN";
+            log(`DISCONNECTED ❌`, "#ff4444");
+            log(`Reason: ${e.wasClean ? "Clean" : "Dirty/Abrupt"}`, "#ff4444");
+            log(`Code: ${e.code}`, "#ff4444");
+            log(`Final State: ${currentState}`, "#ff4444");
+            
+            if (e.code === 1006) {
+                log("HINT: iPhone rejected the Frame or Handshake Hash.", "#f1c40f");
+            }
+        };
 
             ws.onerror = (err) => {
                 log("WEBSOCKET ERROR DETECTED", "#ff4444");

@@ -35,7 +35,10 @@ enum VALUE_TYPE {
     LIGHT_EV,
     HEAT_EV,
     HUM_EV,
-    COUNT_EV
+    SETPOINT_EV,
+    HEAT_RELAY_EV,
+    COUNT_EV,
+    NONE_EV
 };
 
 typedef void (*event_action_t)(void *ctx, uint16_t value);
@@ -97,9 +100,10 @@ struct Room* get_room_by_id(int id);
 
 const struct gpio_dt_spec* get_led_by_id(int id);
 
-bool register_new_event(struct Room *room, uint16_t new_value, bool is_for_web_event);
+int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event);
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
 
-bool register_new_temp_hum_event(struct Room *room, uint32_t temp_value, uint32_t hum_value, bool is_for_web_event);
+bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value);
+
 #endif

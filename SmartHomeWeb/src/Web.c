@@ -55,11 +55,11 @@ static const struct json_obj_descr room_temp_command_descr[] = {
 // JSON commands for temperature setting
 struct room_temp_set_command {
 	int room_id;
-	int desire_temp_value;
+	int setpoint_temp_value;
 };
 static const struct json_obj_descr room_temp_set_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, room_id, JSON_TOK_NUMBER),
-	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, desire_temp_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, setpoint_temp_value, JSON_TOK_NUMBER),
 };
 struct RoomData {
     uint32_t room_id;
@@ -150,7 +150,7 @@ static bool parse_room_light_post(uint8_t *buf, size_t len)
 
     struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
-        register_new_event(room, cmd.light_value, true);
+        register_new_event(room, cmd.light_value, LIGHT_EV, true);
 		return true;
 	}
 	return false;
@@ -169,11 +169,12 @@ static bool parse_temp_post(uint8_t *buf, size_t len)
 		return false;
 	}
 
-	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.desire_temp_value);
+	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.setpoint_temp_value);
 
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
-		room->desired_temperature = cmd.desire_temp_value;
+		register_new_event(room, cmd.setpoint_temp_value, SETPOINT_EV, true);
+		room->desired_temperature = cmd.setpoint_temp_value;
 		return true;
 	}
 	return false;
@@ -262,10 +263,7 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		       const struct http_request_ctx *request_ctx,
 		       struct http_response_ctx *response_ctx, void *user_data)
 {
-	LOG_ERR("Rooms GET handler status %d", status);
 	if (status == HTTP_SERVER_DATA_FINAL) {
-	LOG_ERR("in if final");
-
 		static char json_buf[512];
 
 		struct Room **hardware_rooms = get_all_rooms();
@@ -273,19 +271,14 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		collection.num_rooms = STRUCT_ROOM_COUNT;
 		for (size_t i = 0; i < STRUCT_ROOM_COUNT; i++) {
 			collection.rooms[i].room_id = hardware_rooms[i]->room_id;
-			LOG_DBG("Room ID: %d", collection.rooms[i].room_id);
 			collection.rooms[i].room_name = hardware_rooms[i]->room_name;
-			LOG_DBG("Room name: %s", collection.rooms[i].room_name);
 			collection.rooms[i].temp_sensor_value = hardware_rooms[i]->temp_sensor_value;
-			LOG_DBG("Temp value: %d", collection.rooms[i].temp_sensor_value);
 			collection.rooms[i].hum_sensor_value = hardware_rooms[i]->hum_sensor_value;
 			collection.rooms[i].light_gpio_value = hardware_rooms[i]->light_gpio_value;
 			collection.rooms[i].desired_temperature = hardware_rooms[i]->desired_temperature;
 			collection.rooms[i].heat_relay_state = hardware_rooms[i]->heat_relay_state;
 		}
 		
-		LOG_ERR("ALL rooms gotten");
-
 		int ret = json_arr_encode_buf(
 			room_array_descr,
 			&collection,
@@ -358,8 +351,8 @@ static struct http_resource_detail_dynamic room_command_detail = {
 #define MAX_WS_CLIENTS 5
 static int ws_clients[MAX_WS_CLIENTS] = {0};
 static uint8_t number_of_clients_connected = 0;
-static uint8_t ws_buffer[128];
-static uint8_t ws_tx_buffer[128];
+static uint8_t ws_buffer[256];
+static uint8_t ws_tx_buffer[256];
 
 int ws_setup(int ws_socket, struct http_request_ctx *req_ctx, void *user_data)
 {
@@ -393,14 +386,14 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
         // Process all pending web events
         struct WebEvent *new_web_event = k_fifo_get(&web_events_fifo, K_NO_WAIT);
         if (new_web_event == NULL) {
-            k_msleep(100);
+            k_msleep(200);
             continue;
         }
 
         // Skip event processing if no clients are connected
         if (number_of_clients_connected == 0) {
             k_free(new_web_event);
-            k_msleep(100);
+            k_msleep(200);
             continue;
         }
 
@@ -436,6 +429,18 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 												&room_data,
 												ws_tx_buffer,
 												sizeof(ws_tx_buffer));
+				break;
+			}
+			case SETPOINT_EV: {
+				struct room_temp_set_command room_setpoint_data;
+				room_setpoint_data.room_id = new_web_event->room_id;
+				room_setpoint_data.setpoint_temp_value = new_web_event->value;
+
+				ret = json_obj_encode_buf(room_temp_set_command_descr,
+											ARRAY_SIZE(room_temp_set_command_descr),
+											&room_setpoint_data,
+											ws_tx_buffer,
+											sizeof(ws_tx_buffer));
 				break;
 			}
 			default:
@@ -475,7 +480,7 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
         uint64_t end_time = k_uptime_get();
         LOG_DBG("WebSocket thread processing time: %llu ms", end_time - start_time);
 
-        k_msleep(100);
+        k_msleep(200);
     }
 }
 

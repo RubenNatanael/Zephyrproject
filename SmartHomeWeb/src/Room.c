@@ -110,7 +110,7 @@ bool room_device_init() {
         if (!gpio_is_ready_dt(input_gpio[i])) return 0;
         ret = gpio_pin_configure_dt(input_gpio[i], GPIO_INPUT | input_gpio[i]->dt_flags);
         if (ret != 0) {
-            LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
+            LOG_ERR("Configuring INPUT GPIO pin failed: %d", ret);
             return false;
         }
     }
@@ -120,7 +120,7 @@ bool room_device_init() {
     int number_of_out = sizeof(output_gpio) / sizeof(struct gpio_dt_spec*);
     for (int i = 0; i < number_of_out; i++) {
         if (!gpio_is_ready_dt(output_gpio[i])) return 0;
-        ret = gpio_pin_configure_dt(output_gpio[i], GPIO_OUTPUT | output_gpio[i]->dt_flags);
+        ret = gpio_pin_configure_dt(output_gpio[i], GPIO_OUTPUT_ACTIVE);
         if (ret != 0) {
             LOG_ERR("Configuring OUTPUT GPIO pin failed: %d", ret);
             return false;
@@ -163,94 +163,81 @@ const struct gpio_dt_spec* get_led_by_id(int id) {
     return &leds[id];
 }
 
-bool register_new_event(struct Room *room, uint16_t new_value, bool is_for_web_event) {
+int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event) {
     struct Event *new_event = k_malloc(sizeof(struct Event));
-    struct WebEvent *new_web_event = NULL;
 
     if (!new_event) {
         LOG_ERR("Unable to allocate memory for event");
-        return false;
+        return -1;
+    }
+
+    LOG_DBG("Registering event for room %d, type %d, value %d",
+            room->room_id,
+            event_type,
+            new_value);
+    // Only light events and heat relay action are supported for now locally
+    if (event_type == LIGHT_EV) {
+        if (room->light_gpio != NULL) {
+            new_event->action = gpio_event_action;
+            new_event->ctx = (void *)room->light_gpio;
+            new_event->value = new_value ? 1 : 0;
+        } else if (room->light_pwm != NULL) {
+            new_event->action = pwm_event_action;
+            new_event->ctx = (void *)room->light_pwm;
+            new_event->value = new_value;
+        } else {
+            LOG_ERR("No light actuator defined for room %d", room->room_id);
+            k_free(new_event);
+            return -1;
+        }
+        k_fifo_put(&events_fifo, new_event);
+
+    } else if (event_type == HEAT_RELAY_EV) {
+        new_event->action = gpio_event_action;
+        new_event->ctx = (void *)room->heat_relay;
+        new_event->value = new_value ? 1 : 0;
+        
+        k_fifo_put(&events_fifo, new_event);
     }
 
     if (is_for_web_event) {
-        new_web_event = k_malloc(sizeof(struct WebEvent));
-        if (!new_web_event) {
-            LOG_ERR("Unable to allocate memory for web event(LIGHT)");
-            k_free(new_event);
-            return false;
+        LOG_DBG("Registering web event for room %d, type %d, value %d",
+                room->room_id,
+                event_type,
+                new_value);
+        bool res = register_new_web_event(room->room_id, event_type, new_value);
+        if (!res) {
+            LOG_ERR("Unable to register web event");
+            return 1;
         }
     }
-
-
-    /* Register light events */
-    if (room->light_gpio != NULL) {
-        new_event->action = gpio_event_action;
-        new_event->ctx = (void *)room->light_gpio;
-        new_event->value = new_value ? 1 : 0;
-    }
-    if (room->light_pwm != NULL) {
-        new_event->action = pwm_event_action;
-        new_event->ctx = (void *)room->light_pwm;
-        new_event->value = new_value;
-    }
-    if (!is_for_web_event) {
-        k_free(new_web_event);
-        new_web_event = NULL;
-    } else {
-        new_web_event->room_id = room->room_id;
-        new_web_event->value_type = LIGHT_EV;
-        new_web_event->value = new_value ? 1 : 0;
-    }
-
-    k_fifo_put(&events_fifo, new_event);
-    if (is_for_web_event) {
-        k_fifo_put(&web_events_fifo, new_web_event);
-    }
-    return true;
+    
+    return 0;
 }
 
-bool register_new_temp_hum_event(struct Room *room, uint32_t temp_value, uint32_t hum_value, bool is_for_web_event) {
-    if (!is_for_web_event) {
-        return true;
-    }
-    
-    struct WebEvent *new_web_event_temp = k_malloc(sizeof(struct WebEvent));
-    if (!new_web_event_temp) {
-        LOG_ERR("Unable to allocate memory for web event(TEMP)");
-        return false;
-    }
-    
-    struct WebEvent *new_web_event_hum = k_malloc(sizeof(struct WebEvent));
-    if (!new_web_event_hum) {
-        LOG_ERR("Unable to allocate memory for web event(HUM)");
-        k_free(new_web_event_temp);
+bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value) {
+    struct WebEvent *new_web_event = k_malloc(sizeof(struct WebEvent));
+    if (!new_web_event) {
+        LOG_ERR("Unable to allocate memory for web event");
         return false;
     }
 
-    new_web_event_temp->room_id = room->room_id;
-    new_web_event_temp->value_type = HEAT_EV;
-    new_web_event_temp->value = temp_value;
+    new_web_event->room_id = room_id;
+    new_web_event->value_type = value_type;
+    new_web_event->value = value;
 
-    new_web_event_hum->room_id = room->room_id;
-    new_web_event_hum->value_type = HUM_EV;
-    new_web_event_hum->value = hum_value;
-
-    k_fifo_put(&web_events_fifo, new_web_event_temp);
-    k_fifo_put(&web_events_fifo, new_web_event_hum);
-    
+    k_fifo_put(&web_events_fifo, new_web_event);
     return true;
 }
 
 // For testing purposes only, simulating temperature and humidity readings
-static int x = 400;
+static int x = 0;
 
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled) {
-
-    x = x + 100;
+    x = x + 50;
     *temp_scaled = 2000 + x ;
     *hum_scaled = 2000  + x - 100;
-    x++;
     return 0;
 
     int rc;

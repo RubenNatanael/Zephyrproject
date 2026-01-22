@@ -43,7 +43,7 @@ void listening_switch_events_thread(void) {
             if (new_state != rooms[i]->light_gpio_value) {
                 // In case is a PWM event light needs special value so I calculated it here
                 new_state = rooms[i]->light_pwm->period * percentage_ / 100;
-                register_new_event(rooms[i], new_state, true);
+                register_new_event(rooms[i], new_state, LIGHT_EV, true);
                 rooms[i]->light_gpio_value = new_state;
             }
         }
@@ -66,16 +66,19 @@ void listening_tmp_events_thread(void) {
 
             if (temp_scaled_value != rooms[i]->temp_sensor_value ||
                 hum_scaled_value != rooms[i]->hum_sensor_value) {
-                register_new_temp_hum_event(rooms[i], temp_scaled_value, hum_scaled_value, true);
+                register_new_event(rooms[i], temp_scaled_value, HEAT_EV, true);
+                register_new_event(rooms[i], hum_scaled_value, HUM_EV, true);
                 rooms[i]->temp_sensor_value = temp_scaled_value;
                 rooms[i]->hum_sensor_value = hum_scaled_value;
             }
             
-            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature) {
-                register_new_event(rooms[i], 1, false);
+            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature 
+                && rooms[i]->heat_relay_state == false) {
+                register_new_event(rooms[i], 1, HEAT_RELAY_EV, false);
                 rooms[i]->heat_relay_state = true;
-            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature) {
-                register_new_event(rooms[i], 0, false);
+            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature 
+                && rooms[i]->heat_relay_state == true) {
+                register_new_event(rooms[i], 0, HEAT_RELAY_EV, false);
                 rooms[i]->heat_relay_state = false;
             }
         }
@@ -86,13 +89,13 @@ void listening_tmp_events_thread(void) {
 
 void execut_events_thread(void) {
     while (1) {
+
         struct Event *registered_event = k_fifo_get(&events_fifo,
 							   K_FOREVER);
         registered_event->action(
             registered_event->ctx,
             registered_event->value
         );
-
         k_free(registered_event);
 
         k_msleep(SLEEP_TIME_MS);
