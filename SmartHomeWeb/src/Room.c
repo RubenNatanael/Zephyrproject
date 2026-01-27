@@ -274,3 +274,35 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_sc
 
     return 0;
 }
+
+static void turn_on_off_temperature(struct Room *room, bool turn_on) {
+    if (turn_on && room->heat_relay_state == false) {
+        register_new_event(room, 1, HEAT_RELAY_EV, false);
+        room->heat_relay_state = true;
+    } else if (!turn_on && room->heat_relay_state == true) {
+        register_new_event(room, 0, HEAT_RELAY_EV, false);
+        room->heat_relay_state = false;
+    }
+}
+
+void process_temperature_control(struct Room *room) {
+    if (room->temp_sensor_value < room->desired_temperature - room->offset_desired_temperature 
+        && room->heat_relay_state == false) {
+        turn_on_off_temperature(room, true);
+    } else if (room->temp_sensor_value > room->desired_temperature + room->offset_desired_temperature 
+        && room->heat_relay_state == true) {
+        turn_on_off_temperature(room, false);
+    }
+}
+
+static void turn_on_off_light(struct Room *room, uint16_t new_light_gpio_value) {
+    register_new_event(room, new_light_gpio_value, LIGHT_EV, false);
+    room->light_gpio_value = new_light_gpio_value;
+}
+
+void process_light_control(struct Room *room, uint16_t new_light_gpio_value) {
+    if (new_light_gpio_value != room->light_gpio_value) {
+        turn_on_off_light(room, new_light_gpio_value);
+    }
+
+}

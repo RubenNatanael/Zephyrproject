@@ -34,18 +34,16 @@ void listening_switch_events_thread(void) {
     struct Room **rooms = get_all_rooms();
 
     while (1) {
-        int percentage_ = 50;
+        int percentage_ = 90;
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
 
-            bool new_state = gpio_pin_get_dt(rooms[i]->light_switch);
+            uint16_t new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
-            if (new_state != rooms[i]->light_gpio_value) {
-                // In case is a PWM event light needs special value so I calculated it here
-                new_state = rooms[i]->light_pwm->period * percentage_ / 100;
-                register_new_event(rooms[i], new_state, LIGHT_EV, true);
-                rooms[i]->light_gpio_value = new_state;
-            }
+            // In case is a PWM event light needs special value so I calculated it here (90% of brightness for ON state)
+            new_state = rooms[i]->light_pwm->period * percentage_ / 100;
+
+            process_light_control(rooms[i], new_state);
         }
 
         k_msleep(SLEEP_TIME_MS);
@@ -72,15 +70,7 @@ void listening_tmp_events_thread(void) {
                 rooms[i]->hum_sensor_value = hum_scaled_value;
             }
             
-            if (rooms[i]->desired_temperature > rooms[i]->temp_sensor_value - rooms[i]->offset_desired_temperature 
-                && rooms[i]->heat_relay_state == false) {
-                register_new_event(rooms[i], 1, HEAT_RELAY_EV, false);
-                rooms[i]->heat_relay_state = true;
-            } else if (rooms[i]->desired_temperature < rooms[i]->temp_sensor_value + rooms[i]->offset_desired_temperature 
-                && rooms[i]->heat_relay_state == true) {
-                register_new_event(rooms[i], 0, HEAT_RELAY_EV, false);
-                rooms[i]->heat_relay_state = false;
-            }
+            process_temperature_control(rooms[i]);
         }
 
         k_sleep(K_SECONDS(10));

@@ -106,4 +106,8 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
 
 bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value);
 
+void process_temperature_control(struct Room *room);
+
+void process_light_control(struct Room *room, uint16_t new_light_gpio_value);
+
 #endif
