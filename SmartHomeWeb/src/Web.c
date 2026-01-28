@@ -38,7 +38,6 @@ static const struct json_obj_descr room_light_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_light_command, light_value, JSON_TOK_NUMBER),
 };
 
-
 // JSON commands for temperature and humidity only for reading
 struct room_temp_read_command {
 	int room_id;
@@ -61,6 +60,17 @@ static const struct json_obj_descr room_temp_set_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, room_id, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct room_temp_set_command, setpoint_temp_value, JSON_TOK_NUMBER),
 };
+
+struct room_temp_heat_relay_command {
+	int room_id;
+	bool heat_relay_state;
+};
+
+static const struct json_obj_descr room_temp_heat_relay_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct room_temp_heat_relay_command, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_temp_heat_relay_command, heat_relay_state, JSON_TOK_TRUE),
+};
+
 struct RoomData {
     uint32_t room_id;
     const char* room_name;
@@ -175,6 +185,8 @@ static bool parse_temp_post(uint8_t *buf, size_t len)
 	if (room != NULL) {
 		register_new_event(room, cmd.setpoint_temp_value, SETPOINT_EV, true);
 		room->desired_temperature = cmd.setpoint_temp_value;
+		// After setting new desired temperature, process control logic
+		process_temperature_control(room);
 		return true;
 	}
 	return false;
@@ -443,6 +455,16 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 											sizeof(ws_tx_buffer));
 				break;
 			}
+			case HEAT_RELAY_EV:
+				struct room_temp_heat_relay_command room_heat_relay_data;
+				room_heat_relay_data.room_id = new_web_event->room_id;
+				room_heat_relay_data.heat_relay_state = new_web_event->value ? true : false;
+				ret = json_obj_encode_buf(room_temp_heat_relay_command_descr,
+											ARRAY_SIZE(room_temp_heat_relay_command_descr),
+											&room_heat_relay_data,
+											ws_tx_buffer,
+											sizeof(ws_tx_buffer));
+				break;
 			default:
 				LOG_WRN("Unknown web event type: %d", new_web_event->value_type);
 				break;

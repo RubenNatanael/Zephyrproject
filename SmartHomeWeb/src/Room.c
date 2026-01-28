@@ -277,10 +277,10 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_sc
 
 static void turn_on_off_temperature(struct Room *room, bool turn_on) {
     if (turn_on && room->heat_relay_state == false) {
-        register_new_event(room, 1, HEAT_RELAY_EV, false);
+        register_new_event(room, 1, HEAT_RELAY_EV, true);
         room->heat_relay_state = true;
     } else if (!turn_on && room->heat_relay_state == true) {
-        register_new_event(room, 0, HEAT_RELAY_EV, false);
+        register_new_event(room, 0, HEAT_RELAY_EV, true);
         room->heat_relay_state = false;
     }
 }
