@@ -60,7 +60,7 @@ static struct Room lr_room  = {
     .desired_temperature = 2200,
     .heat_relay = &lr_gpio_relay_temp,
     .heat_relay_state = false,
-    .offset_desired_temperature = 50
+    .offset_desired_temperature = 50,
 };
 static struct Room kr_room = { 
     .room_id = KITCHEN_ROOM,
@@ -76,7 +76,7 @@ static struct Room kr_room = {
     .desired_temperature = 2200,
     .heat_relay = &kr_gpio_relay_temp,
     .heat_relay_state = false,
-    .offset_desired_temperature = 50
+    .offset_desired_temperature = 50,
 };
 
 static struct Room *rooms[STRUCT_ROOM_COUNT] = { 
@@ -139,13 +139,13 @@ bool room_device_init() {
     return true;
 }
  
-void gpio_event_action(void *ctx, uint16_t value)
+void gpio_event_action(void *ctx, uint32_t value)
 {
     const struct gpio_dt_spec *gpio = ctx;
     gpio_pin_set(gpio->port, gpio->pin, value);
 }
 
-void pwm_event_action(void *ctx, uint16_t value)
+void pwm_event_action(void *ctx, uint32_t value)
 {
     const struct pwm_dt_spec *pwm = ctx;
     pwm_set_dt(pwm, pwm->period, value);
@@ -163,9 +163,9 @@ const struct gpio_dt_spec* get_led_by_id(int id) {
     return &leds[id];
 }
 
-int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event) {
-    struct Event *new_event = k_malloc(sizeof(struct Event));
+int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event) {
 
+    struct Event *new_event = k_malloc(sizeof(struct Event));
     if (!new_event) {
         LOG_ERR("Unable to allocate memory for event");
         return -1;
@@ -175,6 +175,7 @@ int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE ev
             room->room_id,
             event_type,
             new_value);
+    bool isLocalEventRegistered = true;
     // Only light events and heat relay action are supported for now locally
     if (event_type == LIGHT_EV) {
         if (room->light_gpio != NULL) {
@@ -196,8 +197,11 @@ int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE ev
         new_event->action = gpio_event_action;
         new_event->ctx = (void *)room->heat_relay;
         new_event->value = new_value ? 1 : 0;
-        
         k_fifo_put(&events_fifo, new_event);
+    } else {
+        LOG_WRN ("Unsupported event type %d for local execution", event_type);
+        k_free(new_event);
+        isLocalEventRegistered = false;
     }
 
     if (is_for_web_event) {
@@ -208,11 +212,11 @@ int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE ev
         bool res = register_new_web_event(room->room_id, event_type, new_value);
         if (!res) {
             LOG_ERR("Unable to register web event");
-            return 1;
+            return 2;
         }
     }
     
-    return 0;
+    return isLocalEventRegistered ? 0 : 1;
 }
 
 bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value) {
@@ -235,7 +239,7 @@ static int x = 0;
 
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled) {
-    x = x + 50;
+    //x = x + 50;
     *temp_scaled = 2000 + x ;
     *hum_scaled = 2000  + x - 100;
     return 0;
@@ -295,12 +299,12 @@ void process_temperature_control(struct Room *room) {
     }
 }
 
-static void turn_on_off_light(struct Room *room, uint16_t new_light_gpio_value) {
+static void turn_on_off_light(struct Room *room, uint32_t new_light_gpio_value) {
     register_new_event(room, new_light_gpio_value, LIGHT_EV, false);
     room->light_gpio_value = new_light_gpio_value;
 }
 
-void process_light_control(struct Room *room, uint16_t new_light_gpio_value) {
+void process_light_control(struct Room *room, uint32_t new_light_gpio_value) {
     if (new_light_gpio_value != room->light_gpio_value) {
         turn_on_off_light(room, new_light_gpio_value);
     }

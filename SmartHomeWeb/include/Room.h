@@ -41,13 +41,13 @@ enum VALUE_TYPE {
     NONE_EV
 };
 
-typedef void (*event_action_t)(void *ctx, uint16_t value);
+typedef void (*event_action_t)(void *ctx, uint32_t value);
 
 struct Event {
     void *fifo_reserved;
     event_action_t action;
     void *ctx;
-    uint16_t value;
+    uint32_t value;
 };
 
 struct WebEvent {
@@ -68,7 +68,7 @@ struct Room {
     const struct gpio_dt_spec* light_switch;   // INPUT
     const struct pwm_dt_spec* light_pwm;       // OUTPUT PWM
     const struct gpio_dt_spec* light_gpio;     // OUTPUT GPIO
-    uint16_t light_gpio_value;                 // Current GPIO value
+    uint32_t light_gpio_value;                 // Current GPIO value
 
 /* Heat */
     /* Sensor and RTIO IODEV for DHT22 */
@@ -88,9 +88,9 @@ struct Room {
                                                //         100 - 1.00 C
 };
 
-void gpio_event_action(void *ctx, uint16_t value);
+void gpio_event_action(void *ctx, uint32_t value);
 
-void pwm_event_action(void *ctx, uint16_t value);
+void pwm_event_action(void *ctx, uint32_t value);
 
 bool room_device_init();
 
@@ -100,7 +100,7 @@ struct Room* get_room_by_id(int id);
 
 const struct gpio_dt_spec* get_led_by_id(int id);
 
-int register_new_event(struct Room *room, uint16_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event);
+int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event);
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
 
@@ -108,6 +108,6 @@ bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32
 
 void process_temperature_control(struct Room *room);
 
-void process_light_control(struct Room *room, uint16_t new_light_gpio_value);
+void process_light_control(struct Room *room, uint32_t new_light_gpio_value);
 
 #endif

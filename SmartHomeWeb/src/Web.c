@@ -76,7 +76,7 @@ struct RoomData {
     const char* room_name;
     uint32_t temp_sensor_value;
     uint32_t hum_sensor_value;
-    uint16_t light_gpio_value;
+    uint32_t light_gpio_value;
     uint32_t desired_temperature;
     bool heat_relay_state;
 };
@@ -159,11 +159,9 @@ static bool parse_room_light_post(uint8_t *buf, size_t len)
 	LOG_INF("POST request setting LIGHT %d to state %d", cmd.room_id, cmd.light_value);
 
     struct Room *room = get_room_by_id(cmd.room_id);
-	if (room != NULL) {
-        register_new_event(room, cmd.light_value, LIGHT_EV, true);
-		return true;
-	}
-	return false;
+    uint32_t new_state = cmd.light_value ? room->light_pwm->period * 90 /100 : 0;
+	process_light_control(room, new_state);
+	return true;
 }
 
 static bool parse_temp_post(uint8_t *buf, size_t len)
@@ -179,7 +177,7 @@ static bool parse_temp_post(uint8_t *buf, size_t len)
 		return false;
 	}
 
-	LOG_INF("POST request received TEMP %d value %d", cmd.room_id, cmd.setpoint_temp_value);
+	LOG_INF("POST request received ROOM %d SETPOINTvalue %d", cmd.room_id, cmd.setpoint_temp_value);
 
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
@@ -393,7 +391,6 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
     (void)arg1; (void)arg2; (void)arg3;
 
     while (1) {
-        uint64_t start_time = k_uptime_get();
 
         // Process all pending web events
         struct WebEvent *new_web_event = k_fifo_get(&web_events_fifo, K_NO_WAIT);
@@ -499,8 +496,6 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 				number_of_clients_connected--;
 			}
 		}
-        uint64_t end_time = k_uptime_get();
-        LOG_DBG("WebSocket thread processing time: %llu ms", end_time - start_time);
 
         k_msleep(200);
     }

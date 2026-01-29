@@ -1,10 +1,8 @@
 / {
     aliases {
-
         // OUTPUTS
         pwmlivingroom = &pwm_0;
         pwmkitchen = &pwm_1;
-    
         temprelaylivingroom = &temp_relay_livingroom;
         temprelaykitchen = &temp_relay_kitchen;
 
@@ -13,107 +11,84 @@
         switchkitchen = &switch_kitchen;
 
         dht0 = &tempS0;
-		dht1 = &tempS1;
-		dht2 = &tempS2;
-		dht3 = &tempS3;
+        dht1 = &tempS1;
+        dht2 = &tempS2;
+        dht3 = &tempS3;
     };
 
     pwmleds {
         compatible = "pwm-leds";
-
         pwm_0: pwm_0 {
-            pwms = <&pwm4 3 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+            pwms = <&pwm1 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
             label = "Living room light PWM";
         };
         pwm_1: pwm_1 {
-            pwms = <&pwm4 4 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-            label = "Living room light PWM";
+            pwms = <&pwm1 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+            label = "Kitchen light PWM"; // Fixed label duplication
         };
     };
 
     buttons {
         compatible = "gpio-keys";
-
         switch_livingroom: btn_livingroom {
             label = "Living Room switch";
-			gpios = < &gpioa 0x5 GPIO_ACTIVE_HIGH >;
-            status = "okay";
+            gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>; // Mapped to PA5
         };
-
         switch_kitchen: btn_kitchen {
             label = "Kitchen Room switch";
-			gpios = < &gpioa 0x6 GPIO_ACTIVE_HIGH >;
-            status = "okay";
+            gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>; // Mapped to PA6
         };
     };
 
-    relay {
-        compatible = "gpio-keys";
-
+    relays {
+        compatible = "gpio-leds"; // Changed to leds for output functionality
         temp_relay_livingroom: relay1 {
             label = "Living Room Temp. relay";
-            gpios = < &gpiod 0xe GPIO_ACTIVE_HIGH >;
-            status = "okay";
+            gpios = <&gpiod 14 GPIO_ACTIVE_HIGH>; // Mapped to PD14
         };
-
         temp_relay_kitchen: relay2 {
             label = "Kitchen Temp. relay";
-            gpios = < &gpiod 0xf GPIO_ACTIVE_HIGH >;
-            status = "okay";
+            gpios = <&gpiod 15 GPIO_ACTIVE_HIGH>; // Mapped to PD15
         };
     };
-    
 };
 
 &i2c1 {
-	status = "okay";
-
-	tempS0: hs300x@44 {
-		compatible = "renesas,hs300x";
-		reg = <0x44>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-	};
-
-	tempS1: hs300x@48 {
-		compatible = "renesas,hs300x";
-		reg = <0x48>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-	};
-	tempS2: hs300x@4a {
-		compatible = "renesas,hs300x";
-		reg = <0x4a>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-	};
-	tempS3: hs300x@4b {
-		compatible = "renesas,hs300x";
-		reg = <0x4b>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-	};
+    status = "okay";
+    
+    tempS0: hs300x@44 {
+        compatible = "renesas,hs300x";
+        reg = <0x44>;
+    };
+    tempS1: hs300x@48 {
+        compatible = "renesas,hs300x";
+        reg = <0x48>;
+    };
+    tempS2: hs300x@4a {
+        compatible = "renesas,hs300x";
+        reg = <0x4a>;
+    };
+    tempS3: hs300x@4b {
+        compatible = "renesas,hs300x";
+        reg = <0x4b>;
+    };
 };
-
 
 &timers1 {
     status = "okay";
     st,prescaler = <100>;
-
-    pwm4: pwm {
-        compatible = "st,stm32-pwm";
+    pwm1: pwm {
         status = "okay";
-        #pwm-cells = <3>; 
-        pinctrl-0 = <&pwm4_ch3 &pwm4_ch4>;
+        pinctrl-0 = <&pwm1_ch1_pe9 &pwm1_ch2_pe11>;
         pinctrl-names = "default";
     };
 };
 
 &pinctrl {
-    pwm4_ch3: pwm4_ch3 {
-        pinmux = <STM32_PINMUX('B', 8, AF1)>;
+    pwm1_ch1_pe9: pwm1_ch1_pe9 {
+        pinmux = <STM32_PINMUX('E', 9, AF1)>;
     };
-    pwm4_ch4: pwm4_ch4 {
-        pinmux = <STM32_PINMUX('B', 9, AF1)>;
+    pwm1_ch2_pe11: pwm1_ch2_pe11 {
+        pinmux = <STM32_PINMUX('E', 11, AF1)>;
     };
 };

@@ -29,6 +29,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #define STACKSIZE 1024
 #define PRIORITY 7
 
+
 void listening_switch_events_thread(void) {
 
     struct Room **rooms = get_all_rooms();
@@ -38,12 +39,12 @@ void listening_switch_events_thread(void) {
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
 
-            uint16_t new_state = gpio_pin_get_dt(rooms[i]->light_switch);
+            // uint32_t new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
-            // In case is a PWM event light needs special value so I calculated it here (90% of brightness for ON state)
-            new_state = rooms[i]->light_pwm->period * percentage_ / 100;
+            // // In case is a PWM event light needs special value so I calculated it here (90% of brightness for ON state)
+            // new_state = rooms[i]->light_pwm->period * percentage_ / 100;
 
-            process_light_control(rooms[i], new_state);
+            // process_light_control(rooms[i], new_state);
         }
 
         k_msleep(SLEEP_TIME_MS);
@@ -108,7 +109,7 @@ int main(void)
     LOG_INF("HTTP server started");
     while (1) {
 
-        check_memory();
+        //check_memory();
         ret = gpio_pin_toggle_dt(get_led_by_id(ROOM_LED_POWER));
         if (ret < 0) {
             return -1;
