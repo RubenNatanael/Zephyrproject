@@ -94,6 +94,7 @@
         }
 
         let dragging = false;
+        let activeId = 0;
         
         window.onmousemove = window.ontouchmove = (e) => { if(dragging) update(e.touches ? e.touches[0] : e); };
         
@@ -146,6 +147,29 @@
             ) * 10;
 
             updateSetpoint(activeId, value100);
+        }
+
+        // Expand/collapse card details
+        function toggleEx(roomId) {
+            const card = document.getElementById(`card-${roomId}`);
+            if (!card) return;
+            card.classList.toggle('expanded');
+            const schedule = card.querySelector('.schedule');
+            if (schedule) {
+                // toggling pointer-events + opacity already controlled by CSS via .expanded
+                // ensure the schedule visibility state matches the card state
+                // (no-op here, CSS handles it) 
+            }
+        }
+
+        // Update the LIVE indicator in the page header/footer
+        function setLiveIndicator(connected) {
+            const el = document.getElementById('live-indicator');
+            if (!el) return;
+            const circle = el.querySelector('.live-dot');
+            el.querySelector('.live-text').textContent = connected ? 'LIVE' : 'OFFLINE';
+            if (circle) circle.style.background = connected ? '#2ecc71' : '#ff4444';
+            el.title = connected ? 'WebSocket connected' : 'WebSocket disconnected';
         }
 
 
@@ -204,137 +228,72 @@
         // Fetch rooms dynamically when the page loads
         window.addEventListener('DOMContentLoaded', fetchRooms);
 
-        // // Is not calling back to nucleo, just receiving updates
-        // window.addEventListener("DOMContentLoaded", (ev) => {
-        //     const ws = new WebSocket(`/ws`);
-        //     ws.onopen = () => {
-        //         console.log("Connected to Zephyr WebSocket");
-        //     };
-
-        //     ws.onmessage = (event) => {
-        //         const data = JSON.parse(event.data);
-        //         console.log("Received JSON:", data);
-
-        //         // Update temperature and humidity values
-        //         if (data.temp_value !== undefined) {
-        //             rooms[data.room_id].temp_sensor_value = data.temp_value * 100;
-        //             rooms[data.room_id].hum_sensor_value = data.hum_value * 100;
-                    
-        //             console.log("TEMP: ", data.temp_value);
-        //             document.getElementById(`real-${data.room_id}`).textContent = data.temp_value;
-        //         }
-
-        //         // Update light/led values
-        //         if (data.light_value !== undefined) {
-
-        //             rooms[data.room_id].light_gpio_value = data.light_value;
-        //             const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
-        //             if (lightCheckbox) {
-        //                 lightCheckbox.checked = data.light_value === 1;
-        //             }
-        //             console.log(`Room ${data.room_id} light is now: ${data.light_value}`);
-        //         }
-        //     };
-
-        //     ws.onclose = () => {
-        //         console.log("WebSocket disconnected");
-        //     };
-
-        //     ws.onerror = (err) => {
-        //         alert("WebSocket Error Detected!");
-        //         console.error("WebSocket error:", err);
-        //     };
-        // })
-
-
-        // For testing on phones, to be removed later
-         // --- LOGGING UTILITY FOR IPHONE ---
-        const log = (msg, color = "white") => {
-            const debugDiv = document.getElementById('debug-console');
-            if (!debugDiv) return;
-            const entry = document.createElement('div');
-            entry.style.color = color;
-            entry.style.borderBottom = "1px solid #333";
-            entry.style.padding = "2px";
-            entry.innerText = `> ${msg}`;
-            debugDiv.prepend(entry); // Newest logs at the top
-        };
-
-        // Error catching for general JS errors
-        window.onerror = (m, u, l) => log(`JS ERR: ${m} (line ${l})`, "#ff4444");
-
-        window.addEventListener("DOMContentLoaded", () => {
-            // 1. Create the UI for the Debug Console
-            const consoleDiv = document.createElement('div');
-            consoleDiv.id = 'debug-console';
-            consoleDiv.style = "position:fixed; bottom:0; left:0; width:100%; height:150px; background:rgba(0,0,0,0.9); color:#0f0; font-family:monospace; font-size:10px; overflow-y:auto; z-index:10000; border-top:2px solid #8b5cf6; padding:5px; pointer-events:none;";
-            document.body.appendChild(consoleDiv);
-
-            log("Initializing WebSocket...", "#8b5cf6");
-
-            // 2. Use Dynamic URL (Works on iPhone & PC)
+        // Is not calling back to nucleo, just receiving updates
+        window.addEventListener("DOMContentLoaded", (ev) => {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws`;
-            log(`Connecting to: ${wsUrl}`);
 
             const ws = new WebSocket(wsUrl);
 
+            // Create live indicator in top-right and initialize as offline
+            const liveDiv = document.createElement('div');
+            liveDiv.id = 'live-indicator';
+            liveDiv.style = 'position:fixed; top:12px; right:12px; z-index:10001; display:flex; align-items:center; gap:8px; font-family: sans-serif; font-weight:700; color:#fff; background: rgba(0,0,0,0.35); padding:6px 10px; border-radius:16px; border:1px solid rgba(255,255,255,0.06);';
+            liveDiv.innerHTML = `<span class="live-dot" style="width:10px;height:10px;border-radius:50%;background:#ff4444;display:inline-block;"></span><span class="live-text">OFFLINE</span>`;
+            document.body.appendChild(liveDiv);
+            setLiveIndicator(false);
+
             ws.onopen = () => {
-                log("CONNECTED TO NUCLEO ✅", "#2ecc71");
+                console.log("Connected to Zephyr WebSocket");
+                setLiveIndicator(true);
             };
 
             ws.onmessage = (event) => {
+                
+
                 try {
-                    // Log raw data to see if iPhone is actually getting bytes
-                    log(`Raw: ${event.data.substring(0, 30)}...`, "#aaa");
-                    
-                    const data = JSON.parse(event.data.trim());
+                    const data = JSON.parse(event.data);
+                    console.log("Received JSON:", data);
                     
                     if (data.temp_value !== undefined) {
                         rooms[data.room_id].temp_sensor_value = data.temp_value;
                         rooms[data.room_id].hum_sensor_value = data.hum_value;
                         document.getElementById(`real-${data.room_id}`).textContent = rooms[data.room_id].temp_sensor_value / 100;
-                        log(`Room ${data.room_id} Update: ${rooms[data.room_id].temp_sensor_value / 100}°C`, "#8b5cf6");
+                        console.log(`Room ${data.room_id} Update: ${rooms[data.room_id].temp_sensor_value / 100}°C`);
                     }
 
                     if (data.light_value !== undefined) {
                         rooms[data.room_id].light_gpio_value = data.light_value;
                         const lightCheckbox = document.querySelector(`#card-${data.room_id} input[type="checkbox"]`);
-                        if (lightCheckbox) lightCheckbox.checked = data.light_value === 1;
+                        if (lightCheckbox) lightCheckbox.checked = data.light_value > 0;
                     }
 
                     if (data.setpoint_temp_value !== undefined) {
                         rooms[data.room_id].desired_temperature = data.setpoint_temp_value;
                         updateSetpoint(data.room_id, data.setpoint_temp_value);
-                        log(`Room ${data.room_id} Setpoint Update: ${data.setpoint_temp_value / 100}°C`, "#8b5cf6");
+                        console.log(`Room ${data.room_id} Setpoint Update: ${data.setpoint_temp_value / 100}°C`);
                     }
                     
                     if (data.heat_relay_state !== undefined) {
                         rooms[data.room_id].heat_relay_state = data.heat_relay_state;
                         document.getElementById(`real-fire-${data.room_id}`).style.opacity = data.heat_relay_state ? "1" : "0.1";
-                        log(`Room ${data.room_id} Heat Relay State: ${data.heat_relay_state ? "ON" : "OFF"}`, "#8b5cf6");
+                        console.log(`Room ${data.room_id} Heat Relay State: ${data.heat_relay_state ? "ON" : "OFF"}`);
                     }
 
                 } catch (e) {
-                    log(`JSON ERROR: ${e.message}`, "#ff4444");
+                    console.log(`JSON ERROR: ${e.message}`);
                 }
             };
-
-            ws.onclose = (e) => {
-            const states = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
-            const currentState = states[ws.readyState] || "UNKNOWN";
-            log(`DISCONNECTED ❌`, "#ff4444");
-            log(`Reason: ${e.wasClean ? "Clean" : "Dirty/Abrupt"}`, "#ff4444");
-            log(`Code: ${e.code}`, "#ff4444");
-            log(`Final State: ${currentState}`, "#ff4444");
             
-            if (e.code === 1006) {
-                log("HINT: iPhone rejected the Frame or Handshake Hash.", "#f1c40f");
-            }
-        };
+
+            ws.onclose = () => {
+                console.log("WebSocket disconnected");
+                setLiveIndicator(false);
+            };
 
             ws.onerror = (err) => {
-                log("WEBSOCKET ERROR DETECTED", "#ff4444");
+                console.error("WebSocket error:", err);
+                setLiveIndicator(false);
             };
         });
     </script>

@@ -341,7 +341,7 @@ void process_temperature_control(struct Room *room) {
 }
 
 static void turn_on_off_light(struct Room *room, uint32_t new_light_gpio_value) {
-    register_new_event(room, new_light_gpio_value, LIGHT_EV, false);
+    register_new_event(room, new_light_gpio_value, LIGHT_EV, true);
     room->light_gpio_value = new_light_gpio_value;
 }
 

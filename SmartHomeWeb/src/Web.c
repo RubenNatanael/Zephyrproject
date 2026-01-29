@@ -485,7 +485,7 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 										ws_tx_buffer, 
 										strlen(ws_tx_buffer),
 										WEBSOCKET_OPCODE_DATA_TEXT,
-										true,
+										false,
 										true,
 										SYS_FOREVER_MS);
 
