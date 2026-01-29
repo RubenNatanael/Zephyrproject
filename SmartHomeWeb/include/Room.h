@@ -74,6 +74,7 @@ struct Room {
     /* Sensor and RTIO IODEV for DHT22 */
     const struct device *const dht_devices;    // INPUT DHT device
     struct rtio_iodev *const dht_iodevs;       // RTIO IODEV for DHT
+    const struct device *const temp_dht11;     // INPUT Temperature sensor device
     uint32_t temp_sensor_value;                // Last read temperature
     uint32_t hum_sensor_value;                 // Last read humidity
     /* Actuators */
@@ -103,6 +104,8 @@ const struct gpio_dt_spec* get_led_by_id(int id);
 int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event);
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
+
+int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled);
 
 bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value);
 

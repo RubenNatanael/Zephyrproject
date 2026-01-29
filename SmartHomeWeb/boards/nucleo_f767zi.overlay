@@ -14,6 +14,16 @@
         dht1 = &tempS1;
         dht2 = &tempS2;
         dht3 = &tempS3;
+
+        dht11 = &my_dht11;
+    };
+
+    temp_sensor {
+        my_dht11: dht11_c {
+            compatible = "aosong,dht";
+            status = "okay";
+            dio-gpios = <&gpiof 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        };
     };
 
     pwmleds {
@@ -24,7 +34,7 @@
         };
         pwm_1: pwm_1 {
             pwms = <&pwm1 2 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
-            label = "Kitchen light PWM"; // Fixed label duplication
+            label = "Kitchen light PWM";
         };
     };
 
@@ -32,11 +42,11 @@
         compatible = "gpio-keys";
         switch_livingroom: btn_livingroom {
             label = "Living Room switch";
-            gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>; // Mapped to PA5
+            gpios = <&gpioa 5 GPIO_ACTIVE_HIGH>;
         };
         switch_kitchen: btn_kitchen {
             label = "Kitchen Room switch";
-            gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>; // Mapped to PA6
+            gpios = <&gpioa 6 GPIO_ACTIVE_HIGH>;
         };
     };
 
@@ -44,11 +54,11 @@
         compatible = "gpio-leds"; // Changed to leds for output functionality
         temp_relay_livingroom: relay1 {
             label = "Living Room Temp. relay";
-            gpios = <&gpiod 14 GPIO_ACTIVE_HIGH>; // Mapped to PD14
+            gpios = <&gpiod 14 GPIO_ACTIVE_LOW>;
         };
         temp_relay_kitchen: relay2 {
             label = "Kitchen Temp. relay";
-            gpios = <&gpiod 15 GPIO_ACTIVE_HIGH>; // Mapped to PD15
+            gpios = <&gpiod 15 GPIO_ACTIVE_LOW>;
         };
     };
 };

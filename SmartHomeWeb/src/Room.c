@@ -45,6 +45,11 @@ SENSOR_DT_READ_IODEV(dht_iodev1,
 
 RTIO_DEFINE(dht_ctx, 1, 1);
 
+/* DHT11 temp sensor */\
+#define DHT11_NODE DT_ALIAS(dht11)
+static const struct device *const dht11_temp_sensor = DEVICE_DT_GET(DHT11_NODE);
+
+
 
 static struct Room lr_room  = { 
     .room_id = LIVINROOM_ROOM,
@@ -61,6 +66,7 @@ static struct Room lr_room  = {
     .heat_relay = &lr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50,
+    .temp_dht11 = dht11_temp_sensor,
 };
 static struct Room kr_room = { 
     .room_id = KITCHEN_ROOM,
@@ -77,6 +83,7 @@ static struct Room kr_room = {
     .heat_relay = &kr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50,
+    .temp_dht11 = dht11_temp_sensor,
 };
 
 static struct Room *rooms[STRUCT_ROOM_COUNT] = { 
@@ -134,6 +141,11 @@ bool room_device_init() {
 			return 0;
 		}
 	}
+
+    if (!device_is_ready(dht11_temp_sensor)) {
+        printk("Sensor dht11 device not ready!\n");
+        return;
+    }
 
 	LOG_INF("Initialization and configuration switch done.");
     return true;
@@ -237,6 +249,35 @@ bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32
 // For testing purposes only, simulating temperature and humidity readings
 static int x = 0;
 
+int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled) {
+    if (room->temp_dht11 == NULL) {
+        LOG_ERR("No DHT11 sensor defined for room %d", room->room_id);
+        return -1;
+    }
+    int rc = sensor_sample_fetch(room->temp_dht11);
+
+    if (rc != 0) {
+        LOG_WRN("Sensor fetch failed: %d\n", rc);
+        return rc;
+    }
+
+    struct sensor_value temperature;
+    struct sensor_value humidity;
+
+    rc = sensor_channel_get(room->temp_dht11, SENSOR_CHAN_AMBIENT_TEMP,
+                &temperature);
+    if (rc == 0) {
+        rc = sensor_channel_get(room->temp_dht11, SENSOR_CHAN_HUMIDITY,
+                    &humidity);
+    }
+    if (rc != 0) {
+        LOG_WRN("get failed: %d\n", rc);
+        return rc;
+    }
+    *temp_scaled = (uint32_t)(sensor_value_to_double(&temperature) * 100);
+    *hum_scaled = (uint32_t)(sensor_value_to_double(&humidity) * 100);
+    return 0;
+}
 
 int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled) {
     //x = x + 50;

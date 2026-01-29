@@ -61,7 +61,17 @@ void listening_tmp_events_thread(void) {
 
             uint32_t temp_scaled_value = 0;
             uint32_t hum_scaled_value = 0;
-            read_temp_and_hum(rooms[i], &temp_scaled_value, &hum_scaled_value);
+            if (rooms[i]->temp_dht11 != NULL) {
+                int res = read_temp_and_hum_dht11(rooms[i], &temp_scaled_value, &hum_scaled_value);
+                k_sleep(K_SECONDS(2));
+                if (res < 0) {
+                    LOG_ERR("Error reading DHT11 sensor for room %d", rooms[i]->room_id);
+                    continue;
+                }
+
+            } else {
+                read_temp_and_hum(rooms[i], &temp_scaled_value, &hum_scaled_value);
+            }
 
             if (temp_scaled_value != rooms[i]->temp_sensor_value ||
                 hum_scaled_value != rooms[i]->hum_sensor_value) {
