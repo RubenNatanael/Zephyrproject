@@ -39,9 +39,68 @@
         .target-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; margin-top: 8px; letter-spacing: 1px;}
         .target-val { font-size: 1.2rem; font-weight: 600; color: var(--primary); }
         
-        .schedule { opacity: 0; margin-top: 20px; transition: 0.3s; pointer-events: none; }
-        .expanded .schedule { opacity: 1; pointer-events: auto; }
+        /* .schedule { opacity: 0; margin-top: 20px; transition: 0.3s; pointer-events: none; }
+        .expanded .schedule { opacity: 1; pointer-events: auto; } */
         .sched-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 0.8rem; }
+        .fire-icon { font-size: 1rem; font-weight: 400; color: var(--text-dim); opacity: 0.1;}
+
+
+        .hum-info { 
+    display: none; 
+    align-items: center; 
+    gap: 8px; 
+    color: #38bdf8; 
+    margin-top: 10px; 
+    font-weight: 600;
+}
+.expanded .hum-info { display: flex; }
+
+/* Dynamic Schedule UI */
+.schedule { 
+    display: none; 
+    flex-direction: column; 
+    gap: 10px; 
+    margin-top: 20px; 
+}
+.expanded .schedule { display: flex; }
+
+.sched-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.05);
+    padding: 8px;
+    border-radius: 12px;
+}
+
+.sched-row input {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: white;
+    padding: 4px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+}
+
+.btn-add-main {
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    border: 1px dashed var(--primary);
+    color: var(--primary);
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 10px;
+}
+
+.btn-del {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0 5px;
+}
     </style>
 </head>
 <body>
@@ -80,15 +139,16 @@
                     <div class="temp-display">
                         <div class="real-val">
                             <span id="real-${r.room_id}">${r.temp_sensor_value / 100}</span>°
-                            <span id="real-fire-${r.room_id}" style="font-size: 1rem; font-weight: 400; color: var(--text-dim);">🔥</span>
+                            <span id="real-fire-${r.room_id}" class="fire-icon">🔥</span>
                         </div>
                         <div class="target-label">Target</div>
                         <div class="target-val"><span id="set-${r.room_id}">${r.desired_temperature / 100}</span>°</div>
                     </div>
                 </div>
                 <div class="schedule">
-                    <div class="sched-item flex"><span>Morning</span><b>21°C</b></div>
-                    <div class="sched-item flex"><span>Night</span><b>18°C</b></div>
+                    <button class="btn-add-main" onclick="addNewScheduleRow(${r.room_id})">+ Add Hour</button>
+                    <div id="sched-list-${r.room_id}">
+                        </div>
                 </div>
             </div>`;
         }
