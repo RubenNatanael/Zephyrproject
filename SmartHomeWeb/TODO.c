@@ -118,7 +118,7 @@ static uint64_t get_net_time(void) {
 
     LOG_INF("Sending SNTP request...");
     
-    rv = sntp_query(server, SYS_FOREVER_MS, &sntp_time);
+    rv = sntp_simple(server, SYS_FOREVER_MS, &sntp_time);
     if (rv < 0) {
         LOG_ERR("SNTP lookup failed: %d", rv);
         return;
