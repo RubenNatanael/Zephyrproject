@@ -44,63 +44,16 @@
         .sched-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; margin-bottom: 8px; font-size: 0.8rem; }
         .fire-icon { font-size: 1rem; font-weight: 400; color: var(--text-dim); opacity: 0.1;}
 
-
-        .hum-info { 
-    display: none; 
-    align-items: center; 
-    gap: 8px; 
-    color: #38bdf8; 
-    margin-top: 10px; 
-    font-weight: 600;
-}
-.expanded .hum-info { display: flex; }
-
-/* Dynamic Schedule UI */
-.schedule { 
-    display: none; 
-    flex-direction: column; 
-    gap: 10px; 
-    margin-top: 20px; 
-}
-.expanded .schedule { display: flex; }
-
-.sched-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255,255,255,0.05);
-    padding: 8px;
-    border-radius: 12px;
-}
-
-.sched-row input {
-    background: #1e293b;
-    border: 1px solid #334155;
-    color: white;
-    padding: 4px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-}
-
-.btn-add-main {
-    width: 100%;
-    padding: 8px;
-    background: transparent;
-    border: 1px dashed var(--primary);
-    color: var(--primary);
-    border-radius: 10px;
-    cursor: pointer;
-    margin-bottom: 10px;
-}
-
-.btn-del {
-    background: none;
-    border: none;
-    color: #ef4444;
-    cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0 5px;
-}
+        .hum-info,.schedule{display:none;gap:10px}
+        .expanded .hum-info,.expanded .schedule{display:flex;flex-direction:column}
+        .hum-info{align-items:center;color:#38bdf8;font-weight:600;margin-top:10px}
+        .schedule{margin-top:20px}
+        .sched-row{display:flex;align-items:center;width:180px;gap:10px;background:rgba(255,255,255,.05);padding:8px;border-radius:12px}
+        .sched-row input{width:95px;background:#1e293b;border:1px solid #334155;color:#fff;padding:4px;border-radius:6px;font-size:.8rem}
+        .sched-row input[type="number"]{width:50px}
+        .btn-add-main{width:100%;padding:8px;background:0 0;border:1px dashed var(--primary);color:var(--primary);border-radius:10px;margin-bottom:10px;cursor:pointer}
+        .btn-del{background:0 0;border:0;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:0 5px}
+        
     </style>
 </head>
 <body>
@@ -146,13 +99,32 @@
                     </div>
                 </div>
                 <div class="schedule">
+                  <div class="hum-info" id="hum-${r.room_id}">
+                      <span style="font-size: 1.2rem;">💧</span>
+                      <span>${r.hum_sensor_value}% Humidity</span>
+                  </div>
                     <button class="btn-add-main" onclick="addNewScheduleRow(${r.room_id})">+ Add Hour</button>
                     <div id="sched-list-${r.room_id}">
                         </div>
                 </div>
             </div>`;
         }
-
+        
+        function addNewScheduleRow(roomId) {
+            const container = document.getElementById(`sched-list-${roomId}`);
+            const row = document.createElement('div');
+            row.className = 'sched-row';
+            
+            row.innerHTML = `
+                <input type="time" value="12:00">
+                <input type="number" value="22" step="0.5">
+                <span style="font-size: 0.8rem; color: var(--text-dim);">°C</span>
+                <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
+            `;
+            
+            container.appendChild(row);
+            // TODO Call here backend function to save new trigger
+        }
         let dragging = false;
         let activeId = 0;
         
