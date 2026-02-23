@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include "config.h"
 
 struct k_sem new_data_sem;
 
@@ -8,7 +9,6 @@ struct TemperatureSchedule {
     int temperature; // scale  *100
 };
 
-#define MAX_SCHEDULES 15
 struct TemperatureSchedule list[MAX_SCHEDULES];
 uint8_t number_of_elements = 0;
 
@@ -109,7 +109,6 @@ CONFIG_RTC=y
 #include <time.h>
 #include <zephyr/drivers/rtc.h>
 
-#define UTC_OFFSET_SECONDS (2 * 3600) // UTC+2
     
 static uint64_t get_net_time(void) {
     struct sntp_time sntp_time;
@@ -141,7 +140,7 @@ static void sync_rtc_with_network() {
     if (sntp_seconds == 0) return;
 
     struct tm time_ptr;
-    time_t local_time_val = (time_t)sntp_seconds + UTC_OFFSET_SECONDS;    
+    time_t local_time_val = (time_t)sntp_seconds + UTC_PLUS_2;    
 
     gmtime_r(&time_val, &time_ptr);
 

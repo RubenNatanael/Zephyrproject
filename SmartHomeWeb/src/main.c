@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "Room.h"
+#include "config.h"
 
 #include <zephyr/sys/sys_heap.h>
 
@@ -23,12 +24,6 @@ void check_memory(void) {
 }
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
-
-
-#define SLEEP_TIME_MS 200
-#define STACKSIZE 1024
-#define PRIORITY 7
-
 
 void listening_switch_events_thread(void) {
 
@@ -113,6 +108,7 @@ int main(void)
 
     int ret = 0;
     ret = http_server_start();
+
     if (ret) {
         LOG_ERR("Server failed: %d", ret);
     }
@@ -135,6 +131,6 @@ int main(void)
 K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
                 PRIORITY, 0, 0);
 K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
-                PRIORITY, 0, 0);
+                PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
-                PRIORITY, 0, 0);
+                PRIORITY_7, 0, 0);

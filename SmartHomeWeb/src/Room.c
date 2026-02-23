@@ -1,6 +1,6 @@
 #include "Room.h"
 
-LOG_MODULE_REGISTER(room, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(room, LOG_LEVEL);
 
 K_FIFO_DEFINE(events_fifo);
 K_FIFO_DEFINE(web_events_fifo);

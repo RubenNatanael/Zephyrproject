@@ -9,8 +9,7 @@
 #include <zephyr/sys/time_units.h>
 
 #include "Room.h"
-
-#define MAX_ROOMS 5
+#include "config.h"
 
 LOG_MODULE_REGISTER(web_server, LOG_LEVEL_DBG);
 static uint16_t ui_port = 80;
@@ -358,7 +357,6 @@ static struct http_resource_detail_dynamic room_command_detail = {
 /* END HTTP resource definitions */
 
 /* WEB sockets */
-#define MAX_WS_CLIENTS 5
 static int ws_clients[MAX_WS_CLIENTS] = {0};
 static uint8_t number_of_clients_connected = 0;
 static uint8_t ws_buffer[256];

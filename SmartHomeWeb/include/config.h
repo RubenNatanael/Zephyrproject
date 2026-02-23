@@ -1,0 +1,25 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define MAX_ROOMS 5
+
+#define MAX_WS_CLIENTS 5
+
+#define SLEEP_TIME_MS 200
+#define STACKSIZE 1024
+#define PRIORITY_7 7
+
+#define MAX_SCHEDULES 15
+
+#define UTC_PLUS_2 (2 * 3600) // UTC+2
+
+#define LOG_LEVEL LOG_LEVEL_DBG
+/*
+LOG_LEVEL_DBG - 4
+LOG_LEVEL_ERR - 1
+LOG_LEVEL_INF - 3
+LOG_LEVEL_NONE - 0
+LOG_LEVEL_WRN - 2
+*/
+
+#endif
