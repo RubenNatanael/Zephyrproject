@@ -62,6 +62,8 @@ void listening_tmp_events_thread(void) {
                 k_sleep(K_SECONDS(2));
                 if (res < 0) {
                     LOG_ERR("Error reading DHT11 sensor for room %d", rooms[i]->room_id);
+                    // Even if temperature is not registered, setpoint may be changed
+                    // so we need to process it
                     process_temperature_control(rooms[i]);
                     continue;
                 }
@@ -146,7 +148,7 @@ int main(void)
         if (ret < 0) {
             return -1;
         }
-        get_seconds_today_from_rtc();
+        // get_seconds_today_from_rtc();
 
         k_sleep(K_SECONDS(2));
     }
@@ -162,5 +164,5 @@ K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
-K_THREAD_DEFINE(executin_schedle_id, STACKSIZE, temperature_schedule_thread, NULL, NULL, NULL,
-                PRIORITY_7, 0, 0);
+// K_THREAD_DEFINE(executin_schedle_id, STACKSIZE, temperature_schedule_thread, NULL, NULL, NULL,
+//                 PRIORITY_7, 0, 0);
