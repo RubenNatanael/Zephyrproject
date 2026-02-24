@@ -6,6 +6,7 @@ target_sources(app PRIVATE
     src/main.c
     src/Room.c
     src/Web.c
+    src/Schedule.c
 )
 
 zephyr_linker_sources(SECTIONS sections-rom.ld)

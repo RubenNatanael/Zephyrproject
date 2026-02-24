@@ -114,16 +114,43 @@
             const container = document.getElementById(`sched-list-${roomId}`);
             const row = document.createElement('div');
             row.className = 'sched-row';
-            
+        
+            // Default values
+            const defaultTime = "12:00";
+            const defaultTemp = 22;
+
             row.innerHTML = `
-                <input type="time" value="12:00">
-                <input type="number" value="22" step="0.5">
+                <input type="time" value="${defaultTime}" class="time-input">
+                <input type="number" value="${defaultTemp}" step="0.5" class="temp-input">
                 <span style="font-size: 0.8rem; color: var(--text-dim);">°C</span>
-                <button class="btn-del" onclick="this.parentElement.remove()">✕</button>
+                <button class="btn-del">✕</button>
             `;
-            
+
+            // 1. Get references to the new inputs
+            const timeIn = row.querySelector('.time-input');
+            const tempIn = row.querySelector('.temp-input');
+            const delBtn = row.querySelector('.btn-del');
+
+            // 2. Define a function to send the current state to Nucleo
+            const syncWithBackend = (isAdding) => {
+                const [hour, min] = timeIn.value.split(':').map(Number);
+                const setpoint = parseFloat(tempIn.value);
+                postSchedule(roomId, setpoint * 100, hour, min, isAdding);
+            };
+
+            // 3. Handle deletion (Sync with isAdd = false)
+            delBtn.onclick = () => {
+                syncWithBackend(false); 
+                row.remove();
+            };
+
+            // 4. Handle changes (Update backend when user edits)
+            row.onchange = () => syncWithBackend(true); // TODO Must remove old set hour
+
             container.appendChild(row);
-            // TODO Call here backend function to save new trigger
+
+            // 5. Initial save to backend (The "Add" action)
+            syncWithBackend(true);
         }
         let dragging = false;
         let activeId = 0;
@@ -204,6 +231,21 @@
             el.title = connected ? 'WebSocket connected' : 'WebSocket disconnected';
         }
 
+        async function postSchedule(roomId, setpoint, hour, min, isAdd) {
+            let path_url = '/api/v1/schedule';
+            let payload = JSON.stringify({"room_id" : roomId,
+	        "setpoint_temp_value": setpoint,
+	        "hour": hour,
+	        "min": min,
+	        "isAdd": isAdd});
+            try {
+                await fetch(path_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+            } catch (err) { console.error("Nucleo Offline", err); }
+        }
 
         // Call nucleo code to set light/led
         async function postLight(roomId, value) {

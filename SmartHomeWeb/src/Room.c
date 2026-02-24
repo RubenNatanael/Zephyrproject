@@ -1,6 +1,6 @@
 #include "Room.h"
 
-LOG_MODULE_REGISTER(room, LOG_LEVEL);
+LOG_MODULE_REGISTER(room, LOG_LEVEL_DBG);
 
 K_FIFO_DEFINE(events_fifo);
 K_FIFO_DEFINE(web_events_fifo);
@@ -62,7 +62,7 @@ static struct Room lr_room  = {
     .dht_iodevs = &dht_iodev0,
     .temp_sensor_value = 2200,
     .hum_sensor_value = 2200,
-    .desired_temperature = 500,
+    .desired_temperature = 2200,
     .heat_relay = &lr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50,
@@ -79,7 +79,7 @@ static struct Room kr_room = {
     .dht_iodevs = &dht_iodev1,
     .temp_sensor_value = 2200,
     .hum_sensor_value = 2200,
-    .desired_temperature = 500,
+    .desired_temperature = 2200,
     .heat_relay = &kr_gpio_relay_temp,
     .heat_relay_state = false,
     .offset_desired_temperature = 50,
@@ -144,7 +144,7 @@ bool room_device_init() {
 
     if (!device_is_ready(dht11_temp_sensor)) {
         printk("Sensor dht11 device not ready!\n");
-        return;
+        return false;
     }
 
 	LOG_INF("Initialization and configuration switch done.");
@@ -305,7 +305,7 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_sc
         q31_t q = q_data.readings[0].temperature;
         int32_t whole = q >> q_data.shift;
         int32_t frac  = ((q & ((1LL << q_data.shift) - 1)) * 100) >> q_data.shift;
-        temp_scaled = (whole * 100) + frac;
+        *temp_scaled = (whole * 100) + frac;
     }
 
     // Process Humidity
@@ -314,7 +314,7 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_sc
         q31_t q = q_data.readings[0].humidity;
         int32_t whole = q >> q_data.shift;
         int32_t frac  = ((q & ((1LL << q_data.shift) - 1)) * 100) >> q_data.shift;
-        hum_scaled = (whole * 100) + frac;
+        *hum_scaled = (whole * 100) + frac;
     }
 
     return 0;

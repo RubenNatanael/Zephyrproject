@@ -10,6 +10,7 @@
 
 #include "Room.h"
 #include "config.h"
+#include "Schedule.h"
 
 #include <zephyr/sys/sys_heap.h>
 
@@ -61,6 +62,7 @@ void listening_tmp_events_thread(void) {
                 k_sleep(K_SECONDS(2));
                 if (res < 0) {
                     LOG_ERR("Error reading DHT11 sensor for room %d", rooms[i]->room_id);
+                    process_temperature_control(rooms[i]);
                     continue;
                 }
 
@@ -98,6 +100,26 @@ void execut_events_thread(void) {
     }
 }
 
+void temperature_schedule_thread() {
+    while(1) {
+        struct TemperatureSchedule *next = get_next_schedule();
+        if (next == NULL) {
+            k_sem_take(&new_data_sem, K_FOREVER); // Sleep until a new schedule is added
+            continue;
+        }
+        uint32_t sleep_ms = calculate_time_for_schedule(next);
+        LOG_INF("Sleep sec more: %d", sleep_ms);
+        
+        int ret = k_sem_take(&new_data_sem, K_MSEC(sleep_ms));
+
+        if (ret == -EAGAIN) {
+            LOG_INF("Schedule, setting temperature to %d", next->temperature);
+            next->room->desired_temperature = next->temperature;
+        } 
+        // If ret == 0: Just restart the loop to recalculate with new data
+    }
+}
+
 int main(void)
 {
     LOG_INF("Booting C++ Zephyr LightSwitch app");
@@ -108,10 +130,14 @@ int main(void)
 
     int ret = 0;
     ret = http_server_start();
-
     if (ret) {
         LOG_ERR("Server failed: %d", ret);
+        return -1;
     }
+
+    LOG_INF("Sync time");
+    sync_rtc_with_network();
+
     LOG_INF("HTTP server started");
     while (1) {
 
@@ -120,6 +146,8 @@ int main(void)
         if (ret < 0) {
             return -1;
         }
+        get_seconds_today_from_rtc();
+
         k_sleep(K_SECONDS(2));
     }
 
@@ -129,8 +157,10 @@ int main(void)
 
 // --- Thread definitions ---
 K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
-                PRIORITY, 0, 0);
+                PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
+                PRIORITY_7, 0, 0);
+K_THREAD_DEFINE(executin_schedle_id, STACKSIZE, temperature_schedule_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);

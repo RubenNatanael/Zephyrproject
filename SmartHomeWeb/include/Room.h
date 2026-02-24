@@ -11,8 +11,8 @@
 
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/drivers/sensor_data_types.h>
-#include <zephyr/rtio/rtio.h>
 
+#include "config.h"
 
 extern struct k_fifo events_fifo;
 extern struct k_fifo web_events_fifo;

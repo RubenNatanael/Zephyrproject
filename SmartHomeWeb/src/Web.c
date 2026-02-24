@@ -10,6 +10,11 @@
 
 #include "Room.h"
 #include "config.h"
+#include "Schedule.h"
+
+#include <zephyr/net/sntp.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/drivers/rtc.h>
 
 LOG_MODULE_REGISTER(web_server, LOG_LEVEL_DBG);
 static uint16_t ui_port = 80;
@@ -100,6 +105,22 @@ static const struct json_obj_descr room_array_descr[] = {
                              num_rooms, room_command_descr, ARRAY_SIZE(room_command_descr)),
 };
 
+struct room_schedule_command {
+	int room_id;
+	int setpoint_temp_value;
+	int hour;
+	int min;
+	bool isAdd;
+};
+
+static const struct json_obj_descr room_schedule_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct room_schedule_command, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_schedule_command, setpoint_temp_value, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_schedule_command, hour, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_schedule_command, min, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct room_schedule_command, isAdd, JSON_TOK_TRUE),
+};
+
 /* End JOSN conf */
 
 static void http_response(struct http_response_ctx *response_ctx, uint16_t status_code,
@@ -120,6 +141,44 @@ struct post_state {
 	uint16_t max_size;
 	post_parser_fn parser;
 };
+
+static bool parse_schedule_post(uint8_t *buf, size_t len)
+{
+	int ret;
+	struct room_schedule_command cmd;
+	const int expected_return_code = BIT_MASK(ARRAY_SIZE(room_schedule_command_descr));
+
+	buf[len] = '\0';
+	ret = json_obj_parse(buf, len, room_schedule_command_descr, ARRAY_SIZE(room_schedule_command_descr), &cmd);
+	if (ret != expected_return_code) {
+		LOG_WRN("Failed to fully parse JSON payload, ret=%d", ret);
+		return false;
+	}
+
+	LOG_INF("POST request schedule Room %d tmp %dC to %d:%d %s",
+		cmd.room_id,
+		cmd.setpoint_temp_value,
+		cmd.hour,
+		cmd.min,
+		cmd.isAdd ? "Add" : "Remove");
+	struct rtc_time zephyr_rtc_time;
+	zephyr_rtc_time.tm_sec  = 0;
+    zephyr_rtc_time.tm_min  = cmd.min;
+    zephyr_rtc_time.tm_hour = cmd.hour;
+	struct TemperatureSchedule schedule = {
+    	.room = get_room_by_id(cmd.room_id),
+    	.time = to_seconds_today(zephyr_rtc_time),
+		.temperature = cmd.setpoint_temp_value,
+	};
+	LOG_INF("WEB time is %d", schedule.time);
+	if (cmd.isAdd) {
+		addNewSchedule(schedule);
+	} else {
+		removeSchedule(schedule);
+	}
+
+	return true;
+}
 
 static bool parse_led_post(uint8_t *buf, size_t len)
 {
@@ -208,6 +267,13 @@ static struct post_state room_temp_post_state = {
 	.cursor = 0,
 	.max_size = 128,
 	.parser = parse_temp_post,
+};
+
+static struct post_state room_schedule_post_state = {
+	.buf = NULL,
+	.cursor = 0,
+	.max_size = 128,
+	.parser = parse_schedule_post,
 };
 
 
@@ -344,6 +410,15 @@ static struct http_resource_detail_dynamic room_temp_resource_detail = {
 		},
 	.cb = post_handler,
 	.user_data = &room_temp_post_state,
+};
+
+static struct http_resource_detail_dynamic room_schedule_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_DYNAMIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_POST),
+		},
+	.cb = post_handler,
+	.user_data = &room_schedule_post_state,
 };
 
 static struct http_resource_detail_dynamic room_command_detail = {
@@ -532,9 +607,11 @@ HTTP_RESOURCE_DEFINE(light_res, test_http_service, "/api/v1/light", &room_light_
 
 HTTP_RESOURCE_DEFINE(temp_res, test_http_service, "/api/v1/temp", &room_temp_resource_detail);
 
+HTTP_RESOURCE_DEFINE(sched_res, test_http_service, "/api/v1/schedule", &room_schedule_resource_detail);
+
 HTTP_RESOURCE_DEFINE(room_res, test_http_service, "/api/v1/rooms", &room_command_detail);
 
 HTTP_RESOURCE_DEFINE(ws_res, test_http_service, "/ws", &ws_resource_detail);
 
 SYS_INIT(web_init, APPLICATION, 0);
-
+    
