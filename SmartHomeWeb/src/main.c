@@ -117,8 +117,12 @@ void temperature_schedule_thread() {
         if (ret == -EAGAIN) {
             LOG_INF("Schedule, setting temperature to %d", next->temperature);
             next->room->desired_temperature = next->temperature;
-        } 
+            k_sleep(K_SECONDS(30)); // Sleep 30 sec to ensure function is not called again
+            continue;
+        }
         // If ret == 0: Just restart the loop to recalculate with new data
+        LOG_INF("Semaphore signal"); // DEBUG
+        k_sleep(K_SECONDS(1)); // DEBUG to be removed!
     }
 }
 

@@ -35,7 +35,7 @@ void sync_rtc_with_network() {
         return;
     }
     uint64_t sntp_seconds = get_net_time();
-	time_t local_time_val = (time_t)sntp_seconds + (2 * 3600);
+	time_t local_time_val = (time_t)sntp_seconds + UTC_PLUS_2;
     struct tm temp_tm;
     gmtime_r(&local_time_val, &temp_tm);
 

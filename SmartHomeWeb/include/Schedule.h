@@ -12,7 +12,7 @@ extern struct k_sem new_data_sem;
 
 struct TemperatureSchedule {
     struct Room *room;
-    int time; // minutes from midnight
+    int time; // seconds from midnight
     int temperature; // scale 100/1
 };
 
