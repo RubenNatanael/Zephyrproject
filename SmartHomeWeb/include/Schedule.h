@@ -10,12 +10,6 @@
 
 extern struct k_sem new_data_sem;
 
-struct TemperatureSchedule {
-    struct Room *room;
-    int time; // seconds from midnight
-    int temperature; // scale 100/1
-};
-
 void sync_rtc_with_network();
 
 uint32_t get_seconds_today_from_rtc(void);
@@ -28,7 +22,7 @@ uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule);
 
 int addNewSchedule(struct TemperatureSchedule schedule);
 
-int removeSchedule(struct TemperatureSchedule target);
+int removeSchedule(struct TemperatureSchedule schedule);
 
 uint32_t to_seconds_today(struct rtc_time time);
 

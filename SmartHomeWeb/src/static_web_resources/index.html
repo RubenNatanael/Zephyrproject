@@ -287,11 +287,11 @@
 
             try {
                 const response = await fetch('/api/v1/rooms');
-                // if (!response.ok) {
-                //     throw new Error(`HTTP error! status: ${response.status}`);
-                // }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-                // const rooms = await response.json();
+                const rooms = await response.json();
 
                 // Clear the container and populate it with fetched room data
                 container.innerHTML = rooms.map(createCard).join('');

@@ -111,6 +111,7 @@ void temperature_schedule_thread() {
         }
         uint32_t sleep_ms = calculate_time_for_schedule(next);
         LOG_DBG("Sleep sec more: %d", sleep_ms);
+        // If delay is negative(), recalculate delay time
         if (sleep_ms < 0)
             continue;
         
@@ -118,7 +119,7 @@ void temperature_schedule_thread() {
 
         if (ret == -EAGAIN) {
             LOG_INF("Schedule, setting temperature to %d", next->temperature);
-            next->room->desired_temperature = next->temperature;
+            next->parent_room->desired_temperature = next->temperature;
             k_sleep(K_SECONDS(5)); // Sleep 5 sec to ensure function is not called again(~error from time)
             continue;
         }

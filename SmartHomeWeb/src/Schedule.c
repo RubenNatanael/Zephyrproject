@@ -5,9 +5,6 @@ LOG_MODULE_REGISTER(schedule, LOG_LEVEL_DBG);
 // Getting Time and setting it RTC
 static const struct device *rtc_dev = DEVICE_DT_GET(DT_NODELABEL(rtc));
 
-struct TemperatureSchedule list[MAX_SCHEDULES];
-uint8_t number_of_elements = 0;
-
 K_SEM_DEFINE(new_data_sem, 0, 1);
 
 static uint64_t get_net_time(void) {
@@ -85,35 +82,41 @@ uint32_t to_seconds_today(struct rtc_time time) {
 // Schedule
 
 struct TemperatureSchedule* get_next_schedule() {
-    if (number_of_elements == 0) return NULL;
-
     int current_time = get_seconds_today_from_rtc();
-    int next_idx = -1;
-    int min_day_idx = 0; // Smallest time overall (for tomorrow)
+    
+    struct TemperatureSchedule *best_today = NULL;
+    struct TemperatureSchedule *earliest_tomorrow = NULL;
 
-    for (int i = 0; i < number_of_elements; i++) {
-        if (list[i].time < list[min_day_idx].time) {
-            min_day_idx = i;
-        }
+    for (int id = 0; id < STRUCT_ROOM_COUNT; id++) {
+        struct Room *room = get_room_by_id(id);
 
-        if (list[i].time > current_time) {
-            if (next_idx == -1 || list[i].time < list[next_idx].time) {
-                next_idx = i;
+        if (room->no_sched == 0) continue;
+
+        for (int i = 0; i < room->no_sched; i++) {
+            struct TemperatureSchedule *current_s = &room->list_of_schedules[i];
+
+            // Track the earliest overall (in case we need to roll over to tomorrow)
+            if (earliest_tomorrow == NULL || current_s->time < earliest_tomorrow->time) {
+                earliest_tomorrow = current_s;
+            }
+
+            // Track the next one for today
+            if (current_s->time > current_time) {
+                if (best_today == NULL || current_s->time < best_today->time) {
+                    best_today = current_s;
+                }
             }
         }
     }
 
-    // If no future event today, use the earliest event of the next day
-    uint8_t currentEventIndex = (next_idx != -1) ? next_idx : min_day_idx;
-
-    return &list[currentEventIndex];
+    return (best_today != NULL) ? best_today : earliest_tomorrow;
 }
 
 uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule) {
     
     int current_time = get_seconds_today_from_rtc();
     int diff = schedule->time - current_time;
-    LOG_ERR("%d - %d = %d", schedule->time, current_time, diff);
+    LOG_DBG("%d - %d = %d", schedule->time, current_time, diff);
 
     if (diff <= 0) diff += 86400; // Wrap around logic
 
@@ -121,40 +124,47 @@ uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule) {
 }
 
 int addNewSchedule(struct TemperatureSchedule schedule) {
-    if (number_of_elements >= MAX_SCHEDULES) return -ENOSPC;
-
-    list[number_of_elements] = schedule;
-    number_of_elements++;
-    LOG_ERR("Adding new schedule and notifing(nr of sched: %d), time %d", number_of_elements, list[number_of_elements - 1].time);
-    LOG_ERR("Temperature is room %d is %d", list[number_of_elements - 1].room->room_id, list[number_of_elements - 1].temperature);
+    struct Room *room = schedule.parent_room;
+    if (room->no_sched >= MAX_SCHEDULES_PER_ROOM) return -ENOSPC;
+    room->list_of_schedules[room->no_sched] = schedule;
+    room->no_sched++;
+    LOG_DBG("Temperature in room %d is %d", room->room_id, room->list_of_schedules[room->no_sched - 1].temperature);
+    LOG_DBG("Adding new schedule and notifing(nr of sched: %d), time %d", room->no_sched, room->list_of_schedules[room->no_sched - 1].time);
     k_sem_give(&new_data_sem);
     
     return 0;
 }
 
-int removeSchedule(struct TemperatureSchedule target) {
-    int index = -1;
+int removeSchedule(struct TemperatureSchedule schedule) {
 
-    for (int i = 0; i < number_of_elements; i++) {
-        if (list[i].time == target.time && 
-            list[i].temperature == target.temperature) {
-            index = i;
-            break;
+    for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
+        struct Room *room = schedule.parent_room;
+
+        if (room->no_sched == 0) return 0;
+        struct TemperatureSchedule *list = room->list_of_schedules;
+
+        int index = -1;
+
+        for (int i = 0; i < room->no_sched; i++) {
+            if (list[i].time == schedule.time && 
+                list[i].temperature == schedule.temperature) {
+                index = i;
+                break;
+            }
         }
-    }
 
-    if (index == -1) {
-        return -ENOENT;
-    }
-    
-    for (int i = index; i < number_of_elements - 1; i++) {
-        list[i] = list[i + 1];
-    }
+        if (index == -1) {
+            return -ENOENT;
+        }
+        
+        for (int i = index; i < room->no_sched - 1; i++) {
+            list[i] = list[i + 1];
+        }
 
-    number_of_elements--;
-    memset(&list[number_of_elements], 0, sizeof(struct TemperatureSchedule));
+        room->no_sched--;
 
-    k_sem_give(&new_data_sem);
+        k_sem_give(&new_data_sem);
+    }
 
     return 0;
 }

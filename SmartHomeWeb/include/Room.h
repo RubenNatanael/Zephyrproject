@@ -57,6 +57,12 @@ struct WebEvent {
     uint32_t value;
 };
 
+struct TemperatureSchedule {
+    int time; // seconds from midnight
+    int temperature; // scale 100/1
+    struct Room *parent_room;
+};
+
 struct Room {
     void* fifo_reserved;
 
@@ -87,6 +93,8 @@ struct Room {
                                                //         50  - 0.50 C
                                                //         75  - 0.75 C
                                                //         100 - 1.00 C
+    struct TemperatureSchedule list_of_schedules[MAX_SCHEDULES_PER_ROOM];
+    uint8_t no_sched;
 };
 
 void gpio_event_action(void *ctx, uint32_t value);

@@ -166,7 +166,7 @@ static bool parse_schedule_post(uint8_t *buf, size_t len)
     zephyr_rtc_time.tm_min  = cmd.min;
     zephyr_rtc_time.tm_hour = cmd.hour;
 	struct TemperatureSchedule schedule = {
-    	.room = get_room_by_id(cmd.room_id),
+    	.parent_room = get_room_by_id(cmd.room_id),
     	.time = to_seconds_today(zephyr_rtc_time),
 		.temperature = cmd.setpoint_temp_value,
 	};

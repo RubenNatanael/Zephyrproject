@@ -9,6 +9,8 @@
 #define STACKSIZE 1024
 #define PRIORITY_7 7
 
+#define MAX_SCHEDULES_PER_ROOM 4
+
 #define MAX_SCHEDULES 15
 
 #define UTC_PLUS_2 (2 * 3600) // UTC+2
