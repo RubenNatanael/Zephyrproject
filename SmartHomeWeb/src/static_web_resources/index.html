@@ -49,10 +49,11 @@
         .hum-info{align-items:center;color:#38bdf8;font-weight:600;margin-top:10px}
         .schedule{margin-top:20px}
         .sched-row{display:flex;align-items:center;width:180px;gap:10px;background:rgba(255,255,255,.05);padding:8px;border-radius:12px}
-        .sched-row input{width:95px;background:#1e293b;border:1px solid #334155;color:#fff;padding:4px;border-radius:6px;font-size:.8rem}
-        .sched-row input[type="number"]{width:50px}
+        .sched-row input{width:110px;background:#1e293b;border:1px solid #334155;color:#fff;padding:4px;border-radius:6px;font-size:.8rem}
+        .sched-row input[type="text"]{width:30px}
         .btn-add-main{width:100%;padding:8px;background:0 0;border:1px dashed var(--primary);color:var(--primary);border-radius:10px;margin-bottom:10px;cursor:pointer}
         .btn-del{background:0 0;border:0;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:0 5px}
+        .btn-add {background: #dfd;color: #040;border: 1px solid #ccc;border-radius: 3px;padding: 2px 6px;}
         
     </style>
 </head>
@@ -121,8 +122,9 @@
 
             row.innerHTML = `
                 <input type="time" value="${defaultTime}" class="time-input">
-                <input type="number" value="${defaultTemp}" step="0.5" class="temp-input">
-                <span style="font-size: 0.8rem; color: var(--text-dim);">°C</span>
+                <input type="text" value="${defaultTemp}" class="temp-input">
+                <span style="font-size: 0.8rem; color: var(--text-dim); margin-right:15px;">°C</span>
+                <button class="btn-add">Add</button>
                 <button class="btn-del">✕</button>
             `;
 
@@ -130,6 +132,7 @@
             const timeIn = row.querySelector('.time-input');
             const tempIn = row.querySelector('.temp-input');
             const delBtn = row.querySelector('.btn-del');
+            const addBtn = row.querySelector('.btn-add');
 
             // 2. Define a function to send the current state to Nucleo
             const syncWithBackend = (isAdding) => {
@@ -145,12 +148,18 @@
             };
 
             // 4. Handle changes (Update backend when user edits)
-            row.onchange = () => syncWithBackend(true); // TODO Must remove old set
+            addBtn.onclick = () => {
+                syncWithBackend(true);
+                timeIn.disabled = true;
+                tempIn.disabled = true;
+                addBtn.disabled = true;
+
+                // Visual feedback (optional)
+                addBtn.innerHTML = "";
+                row.style.opacity = "0.8"; 
+            }
 
             container.appendChild(row);
-
-            // 5. Initial save to backend (The "Add" action)
-            syncWithBackend(true);
         }
         let dragging = false;
         let activeId = 0;
@@ -278,11 +287,11 @@
 
             try {
                 const response = await fetch('/api/v1/rooms');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                // if (!response.ok) {
+                //     throw new Error(`HTTP error! status: ${response.status}`);
+                // }
 
-                const rooms = await response.json();
+                // const rooms = await response.json();
 
                 // Clear the container and populate it with fetched room data
                 container.innerHTML = rooms.map(createCard).join('');

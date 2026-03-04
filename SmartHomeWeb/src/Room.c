@@ -257,7 +257,7 @@ int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* 
     int rc = sensor_sample_fetch(room->temp_dht11);
 
     if (rc != 0) {
-        LOG_WRN("Sensor fetch failed: %d\n", rc);
+        LOG_DBG("Sensor fetch failed: %d\n", rc);
         return rc;
     }
 
@@ -271,7 +271,7 @@ int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* 
                     &humidity);
     }
     if (rc != 0) {
-        LOG_WRN("get failed: %d\n", rc);
+        LOG_DBG("get failed: %d\n", rc);
         return rc;
     }
     *temp_scaled = (uint32_t)(sensor_value_to_double(&temperature) * 100);
