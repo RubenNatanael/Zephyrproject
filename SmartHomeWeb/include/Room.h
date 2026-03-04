@@ -37,6 +37,7 @@ enum VALUE_TYPE {
     HUM_EV,
     SETPOINT_EV,
     HEAT_RELAY_EV,
+    SCHEDULE_ADDED_EV,
     COUNT_EV,
     NONE_EV
 };
@@ -50,17 +51,20 @@ struct Event {
     uint32_t value;
 };
 
-struct WebEvent {
-    void *fifo_reserved;
-    int room_id;
-    enum VALUE_TYPE value_type;
-    uint32_t value;
-};
-
 struct TemperatureSchedule {
     int time; // seconds from midnight
     int temperature; // scale 100/1
     struct Room *parent_room;
+};
+
+struct WebEvent {
+    void *fifo_reserved;
+    int room_id;
+    enum VALUE_TYPE value_type;
+    union {
+        uint32_t value;
+        struct TemperatureSchedule sched;
+    } data;
 };
 
 struct Room {
@@ -115,7 +119,9 @@ int read_temp_and_hum(struct Room *room, uint32_t* temp_fit, uint32_t* hum_fit);
 
 int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* hum_scaled);
 
-bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value);
+bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, void* value);
+
+int register_new_event_complex(struct Room *room, void* new_data, enum VALUE_TYPE event_type, bool is_for_web_event);
 
 void process_temperature_control(struct Room *room);
 

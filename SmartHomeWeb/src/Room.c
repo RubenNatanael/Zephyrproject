@@ -175,13 +175,15 @@ const struct gpio_dt_spec* get_led_by_id(int id) {
     return &leds[id];
 }
 
-int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event) {
+int register_new_event_raw(struct Room *room, void* data, enum VALUE_TYPE event_type, bool is_for_web_event) {
 
     struct Event *new_event = k_malloc(sizeof(struct Event));
     if (!new_event) {
         LOG_ERR("Unable to allocate memory for event");
         return -1;
     }
+    // new_value is always an int if it is used
+    uint32_t new_value = *(uint32_t*)data;
 
     LOG_DBG("Registering event for room %d, type %d, value %d",
             room->room_id,
@@ -217,11 +219,10 @@ int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE ev
     }
 
     if (is_for_web_event) {
-        LOG_DBG("Registering web event for room %d, type %d, value %d",
+        LOG_DBG("Registering web event for room %d, type %d",
                 room->room_id,
-                event_type,
-                new_value);
-        bool res = register_new_web_event(room->room_id, event_type, new_value);
+                event_type);
+        bool res = register_new_web_event(room->room_id, event_type, data);
         if (!res) {
             LOG_ERR("Unable to register web event");
             return 2;
@@ -231,16 +232,30 @@ int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE ev
     return isLocalEventRegistered ? 0 : 1;
 }
 
-bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, uint32_t value) {
+int register_new_event(struct Room *room, uint32_t new_value, enum VALUE_TYPE event_type, bool is_for_web_event) {
+    return register_new_event_raw(room, &new_value, event_type, is_for_web_event);
+}
+
+int register_new_event_complex(struct Room *room, void* new_data, enum VALUE_TYPE event_type, bool is_for_web_event) {
+    return register_new_event_raw(room, new_data, event_type, is_for_web_event);
+}
+
+bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, void *data) {
     struct WebEvent *new_web_event = k_malloc(sizeof(struct WebEvent));
     if (!new_web_event) {
         LOG_ERR("Unable to allocate memory for web event");
         return false;
     }
-
     new_web_event->room_id = room_id;
     new_web_event->value_type = value_type;
-    new_web_event->value = value;
+
+    if (value_type == SCHEDULE_ADDED_EV) {
+        struct TemperatureSchedule *sched = (struct TemperatureSchedule *)data; 
+        new_web_event->data.sched.time = sched->time;
+        new_web_event->data.sched.temperature = sched->temperature;
+    } else {
+        new_web_event->data.value = *(uint32_t*)data;
+    }
 
     k_fifo_put(&web_events_fifo, new_web_event);
     return true;
@@ -275,7 +290,7 @@ int read_temp_and_hum_dht11(struct Room *room, uint32_t* temp_scaled, uint32_t* 
         return rc;
     }
     *temp_scaled = (uint32_t)(sensor_value_to_double(&temperature) * 100);
-    *hum_scaled = (uint32_t)(sensor_value_to_double(&humidity) * 100);
+    *hum_scaled = (uint32_t)(sensor_value_to_double(&humidity));
     return 0;
 }
 

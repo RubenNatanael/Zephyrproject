@@ -119,6 +119,7 @@ void temperature_schedule_thread() {
 
         if (ret == -EAGAIN) {
             LOG_INF("Schedule, setting temperature to %d", next->temperature);
+            register_new_event(next->parent_room, next->temperature, SETPOINT_EV, true);
             next->parent_room->desired_temperature = next->temperature;
             k_sleep(K_SECONDS(5)); // Sleep 5 sec to ensure function is not called again(~error from time)
             continue;

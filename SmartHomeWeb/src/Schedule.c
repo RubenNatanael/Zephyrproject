@@ -131,6 +131,8 @@ int addNewSchedule(struct TemperatureSchedule schedule) {
     LOG_DBG("Temperature in room %d is %d", room->room_id, room->list_of_schedules[room->no_sched - 1].temperature);
     LOG_DBG("Adding new schedule and notifing(nr of sched: %d), time %d", room->no_sched, room->list_of_schedules[room->no_sched - 1].time);
     k_sem_give(&new_data_sem);
+
+    register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &room->list_of_schedules[room->no_sched - 1]);
     
     return 0;
 }
@@ -156,6 +158,8 @@ int removeSchedule(struct TemperatureSchedule schedule) {
         if (index == -1) {
             return -ENOENT;
         }
+
+        register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &list[index]);
         
         for (int i = index; i < room->no_sched - 1; i++) {
             list[i] = list[i + 1];
@@ -164,6 +168,7 @@ int removeSchedule(struct TemperatureSchedule schedule) {
         room->no_sched--;
 
         k_sem_give(&new_data_sem);
+
     }
 
     return 0;

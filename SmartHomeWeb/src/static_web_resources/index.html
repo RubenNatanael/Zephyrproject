@@ -112,6 +112,7 @@
         }
         
         function addNewScheduleRow(roomId) {
+            // Here? Verify if there are allready schedules to display
             const container = document.getElementById(`sched-list-${roomId}`);
             const row = document.createElement('div');
             row.className = 'sched-row';
@@ -361,6 +362,10 @@
                         rooms[data.room_id].heat_relay_state = data.heat_relay_state;
                         document.getElementById(`real-fire-${data.room_id}`).style.opacity = data.heat_relay_state ? "1" : "0.1";
                         console.log(`Room ${data.room_id} Heat Relay State: ${data.heat_relay_state ? "ON" : "OFF"}`);
+                    }
+
+                    if (data.time !== undefined) {
+                        // For new schedule, notification from websocket
                     }
 
                 } catch (e) {

@@ -75,6 +75,18 @@ static const struct json_obj_descr room_temp_heat_relay_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct room_temp_heat_relay_command, heat_relay_state, JSON_TOK_TRUE),
 };
 
+struct TempSchedData {
+	int room_id;
+	int time;
+    int temperature;
+};
+
+static const struct json_obj_descr temp_sched_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct TempSchedData, room_id, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct TempSchedData, time, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct TempSchedData, temperature, JSON_TOK_NUMBER),
+};
+
 struct RoomData {
     uint32_t room_id;
     const char* room_name;
@@ -83,6 +95,8 @@ struct RoomData {
     uint32_t light_gpio_value;
     uint32_t desired_temperature;
     bool heat_relay_state;
+	struct TempSchedData schedules[MAX_SCHEDULES_PER_ROOM];
+	size_t num_sched;
 };
 
 struct RoomCollection {
@@ -98,6 +112,8 @@ static const struct json_obj_descr room_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct RoomData, light_gpio_value, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct RoomData, desired_temperature, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct RoomData, heat_relay_state, JSON_TOK_TRUE),
+	JSON_OBJ_DESCR_OBJ_ARRAY(struct RoomData, schedules, MAX_SCHEDULES_PER_ROOM, 
+                             num_sched, temp_sched_command_descr, ARRAY_SIZE(temp_sched_command_descr)),
 
 };
 static const struct json_obj_descr room_array_descr[] = {
@@ -235,7 +251,7 @@ static bool parse_temp_post(uint8_t *buf, size_t len)
 		return false;
 	}
 
-	LOG_INF("POST request received ROOM %d SETPOINTvalue %d", cmd.room_id, cmd.setpoint_temp_value);
+	LOG_INF("POST request received ROOM %d SETPOINT value %d", cmd.room_id, cmd.setpoint_temp_value);
 
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
@@ -352,6 +368,12 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 			collection.rooms[i].light_gpio_value = hardware_rooms[i]->light_gpio_value;
 			collection.rooms[i].desired_temperature = hardware_rooms[i]->desired_temperature;
 			collection.rooms[i].heat_relay_state = hardware_rooms[i]->heat_relay_state;
+			collection.rooms[i].num_sched = hardware_rooms[i]->no_sched;
+
+			for (size_t j = 0; j < hardware_rooms[i]->no_sched; j++) {
+				collection.rooms[i].schedules[j].time = hardware_rooms[i]->list_of_schedules[j].time;
+				collection.rooms[i].schedules[j].temperature = hardware_rooms[i]->list_of_schedules[j].temperature;
+			}
 		}
 		
 		int ret = json_arr_encode_buf(
@@ -480,17 +502,18 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
         }
 
         LOG_DBG("Sending data");
-		LOG_DBG("Web event: room %d, type %d, value %d",
-				new_web_event->room_id,
-				new_web_event->value_type,
-				new_web_event->value);
+		// Dont't acces data.value without verifing, can lead to ERRORS
+		// LOG_DBG("Web event: room %d, type %d, value %d",
+		// 		new_web_event->room_id,
+		// 		new_web_event->value_type,
+		// 		new_web_event->data.value);
 
 		int ret = 0;
 		switch (new_web_event->value_type) {
 			case LIGHT_EV: {
 				struct room_light_command room_light_data;
 				room_light_data.room_id = new_web_event->room_id;
-				room_light_data.light_value = new_web_event->value;
+				room_light_data.light_value = new_web_event->data.value;
 
 				ret = json_obj_encode_buf(room_light_command_descr,
 											ARRAY_SIZE(room_light_command_descr),
@@ -504,8 +527,8 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 				struct Room *r = get_room_by_id(new_web_event->room_id);
 				struct room_temp_read_command room_data;
 				room_data.room_id = new_web_event->room_id;
-				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->value : (r ? r->temp_sensor_value : 0);
-    			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->value : (r ? r->hum_sensor_value : 0);
+				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->data.value : (r ? r->temp_sensor_value : 0);
+    			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->data.value : (r ? r->hum_sensor_value : 0);
 				ret = json_obj_encode_buf(room_temp_command_descr,
 												ARRAY_SIZE(room_temp_command_descr),
 												&room_data,
@@ -516,7 +539,7 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 			case SETPOINT_EV: {
 				struct room_temp_set_command room_setpoint_data;
 				room_setpoint_data.room_id = new_web_event->room_id;
-				room_setpoint_data.setpoint_temp_value = new_web_event->value;
+				room_setpoint_data.setpoint_temp_value = new_web_event->data.value;
 
 				ret = json_obj_encode_buf(room_temp_set_command_descr,
 											ARRAY_SIZE(room_temp_set_command_descr),
@@ -528,10 +551,21 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 			case HEAT_RELAY_EV:
 				struct room_temp_heat_relay_command room_heat_relay_data;
 				room_heat_relay_data.room_id = new_web_event->room_id;
-				room_heat_relay_data.heat_relay_state = new_web_event->value ? true : false;
+				room_heat_relay_data.heat_relay_state = new_web_event->data.value ? true : false;
 				ret = json_obj_encode_buf(room_temp_heat_relay_command_descr,
 											ARRAY_SIZE(room_temp_heat_relay_command_descr),
 											&room_heat_relay_data,
+											ws_tx_buffer,
+											sizeof(ws_tx_buffer));
+				break;
+			case SCHEDULE_ADDED_EV:
+				struct TempSchedData room_temp_sched_data;
+				room_temp_sched_data.room_id = new_web_event->room_id;
+				room_temp_sched_data.time = new_web_event->data.sched.time;
+				room_temp_sched_data.temperature = new_web_event->data.sched.temperature;
+				ret = json_obj_encode_buf(temp_sched_command_descr,
+											ARRAY_SIZE(temp_sched_command_descr),
+											&room_temp_sched_data,
 											ws_tx_buffer,
 											sizeof(ws_tx_buffer));
 				break;
