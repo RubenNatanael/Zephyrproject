@@ -147,6 +147,9 @@ bool room_device_init() {
         return false;
     }
 
+    k_mutex_init(&lr_room.lock);
+    k_mutex_init(&kr_room.lock);
+
 	LOG_INF("Initialization and configuration switch done.");
     return true;
 }

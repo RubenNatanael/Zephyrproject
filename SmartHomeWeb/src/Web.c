@@ -234,7 +234,9 @@ static bool parse_room_light_post(uint8_t *buf, size_t len)
 
     struct Room *room = get_room_by_id(cmd.room_id);
     uint32_t new_state = cmd.light_value ? room->light_pwm->period * 90 /100 : 0;
+	k_mutex_lock(&room->lock, K_FOREVER);
 	process_light_control(room, new_state);
+	k_mutex_unlock(&room->lock);
 	return true;
 }
 
@@ -256,9 +258,11 @@ static bool parse_temp_post(uint8_t *buf, size_t len)
 	struct Room *room = get_room_by_id(cmd.room_id);
 	if (room != NULL) {
 		register_new_event(room, cmd.setpoint_temp_value, SETPOINT_EV, true);
+		k_mutex_lock(&room->lock, K_FOREVER);
 		room->desired_temperature = cmd.setpoint_temp_value;
 		// After setting new desired temperature, process control logic
 		process_temperature_control(room);
+		k_mutex_unlock(&room->lock);
 		return true;
 	}
 	return false;
@@ -361,6 +365,7 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		struct RoomCollection collection;
 		collection.num_rooms = STRUCT_ROOM_COUNT;
 		for (size_t i = 0; i < STRUCT_ROOM_COUNT; i++) {
+			k_mutex_lock(&hardware_rooms[i]->lock, K_FOREVER);
 			collection.rooms[i].room_id = hardware_rooms[i]->room_id;
 			collection.rooms[i].room_name = hardware_rooms[i]->room_name;
 			collection.rooms[i].temp_sensor_value = hardware_rooms[i]->temp_sensor_value;
@@ -374,6 +379,7 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 				collection.rooms[i].schedules[j].time = hardware_rooms[i]->list_of_schedules[j].time;
 				collection.rooms[i].schedules[j].temperature = hardware_rooms[i]->list_of_schedules[j].temperature;
 			}
+			k_mutex_unlock(&hardware_rooms[i]->lock);
 		}
 		
 		int ret = json_arr_encode_buf(
@@ -527,8 +533,10 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 				struct Room *r = get_room_by_id(new_web_event->room_id);
 				struct room_temp_read_command room_data;
 				room_data.room_id = new_web_event->room_id;
+				k_mutex_lock(&room->lock);
 				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->data.value : (r ? r->temp_sensor_value : 0);
     			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->data.value : (r ? r->hum_sensor_value : 0);
+				k_mutex_unlock(&room->lock);
 				ret = json_obj_encode_buf(room_temp_command_descr,
 												ARRAY_SIZE(room_temp_command_descr),
 												&room_data,

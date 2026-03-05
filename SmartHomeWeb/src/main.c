@@ -54,33 +54,40 @@ void listening_tmp_events_thread(void) {
     while (1) {
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
+            struct Room *room = rooms[i];
 
             uint32_t temp_scaled_value = 0;
             uint32_t hum_scaled_value = 0;
-            if (rooms[i]->temp_dht11 != NULL) {
-                int res = read_temp_and_hum_dht11(rooms[i], &temp_scaled_value, &hum_scaled_value);
+            if (room->temp_dht11 != NULL) {
+                int res = read_temp_and_hum_dht11(room, &temp_scaled_value, &hum_scaled_value);
                 k_sleep(K_SECONDS(2));
                 if (res < 0) {
-                    LOG_WRN("Unable to read DHT11 sensor for room %d", rooms[i]->room_id);
+                    LOG_WRN("Unable to read DHT11 sensor for room %d", room->room_id);
                     // Even if temperature is not registered, setpoint may be changed
                     // so we need to process it
-                    process_temperature_control(rooms[i]);
+                    k_mutex_lock(&room->lock, K_FOREVER);
+                    process_temperature_control(room);
+                    k_mutex_unlock(&room->lock);
                     continue;
                 }
 
             } else {
-                read_temp_and_hum(rooms[i], &temp_scaled_value, &hum_scaled_value);
+                read_temp_and_hum(room, &temp_scaled_value, &hum_scaled_value);
             }
 
-            if (temp_scaled_value != rooms[i]->temp_sensor_value ||
-                hum_scaled_value != rooms[i]->hum_sensor_value) {
-                register_new_event(rooms[i], temp_scaled_value, HEAT_EV, true);
-                register_new_event(rooms[i], hum_scaled_value, HUM_EV, true);
-                rooms[i]->temp_sensor_value = temp_scaled_value;
-                rooms[i]->hum_sensor_value = hum_scaled_value;
+            k_mutex_lock(&room->lock, K_FOREVER);
+            if (temp_scaled_value != room->temp_sensor_value ||
+                hum_scaled_value != room->hum_sensor_value) {
+                k_mutex_unlock(&room->lock);
+                register_new_event(room, temp_scaled_value, HEAT_EV, true);
+                register_new_event(room, hum_scaled_value, HUM_EV, true);
+                k_mutex_lock(&room->lock, K_FOREVER);
+                room->temp_sensor_value = temp_scaled_value;
+                room->hum_sensor_value = hum_scaled_value;
             }
-            
-            process_temperature_control(rooms[i]);
+
+            process_temperature_control(room);
+            k_mutex_unlock(&room->lock);
         }
 
         k_sleep(K_SECONDS(10));
@@ -120,7 +127,9 @@ void temperature_schedule_thread() {
         if (ret == -EAGAIN) {
             LOG_INF("Schedule, setting temperature to %d", next->temperature);
             register_new_event(next->parent_room, next->temperature, SETPOINT_EV, true);
+            k_mutex_lock(&next->parent_room->lock, K_FOREVER);
             next->parent_room->desired_temperature = next->temperature;
+            k_mutex_unlock(&next->parent_room->lock);
             k_sleep(K_SECONDS(5)); // Sleep 5 sec to ensure function is not called again(~error from time)
             continue;
         }

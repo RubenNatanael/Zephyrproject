@@ -83,14 +83,18 @@ uint32_t to_seconds_today(struct rtc_time time) {
 
 struct TemperatureSchedule* get_next_schedule() {
     int current_time = get_seconds_today_from_rtc();
-    
+
     struct TemperatureSchedule *best_today = NULL;
     struct TemperatureSchedule *earliest_tomorrow = NULL;
 
     for (int id = 0; id < STRUCT_ROOM_COUNT; id++) {
         struct Room *room = get_room_by_id(id);
 
-        if (room->no_sched == 0) continue;
+        k_mutex_lock(&room->lock, K_FOREVER);
+        if (room->no_sched == 0) {
+            k_mutex_unlock(&room->lock);
+            continue;
+        }
 
         for (int i = 0; i < room->no_sched; i++) {
             struct TemperatureSchedule *current_s = &room->list_of_schedules[i];
@@ -107,6 +111,7 @@ struct TemperatureSchedule* get_next_schedule() {
                 }
             }
         }
+        k_mutex_unlock(&room->lock);
     }
 
     return (best_today != NULL) ? best_today : earliest_tomorrow;
@@ -125,51 +130,62 @@ uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule) {
 
 int addNewSchedule(struct TemperatureSchedule schedule) {
     struct Room *room = schedule.parent_room;
-    if (room->no_sched >= MAX_SCHEDULES_PER_ROOM) return -ENOSPC;
+
+    k_mutex_lock(&room->lock, K_FOREVER);
+    if (room->no_sched >= MAX_SCHEDULES_PER_ROOM) {
+        k_mutex_unlock(&room->lock);
+        return -ENOSPC;
+    }
     room->list_of_schedules[room->no_sched] = schedule;
     room->no_sched++;
     LOG_DBG("Temperature in room %d is %d", room->room_id, room->list_of_schedules[room->no_sched - 1].temperature);
     LOG_DBG("Adding new schedule and notifing(nr of sched: %d), time %d", room->no_sched, room->list_of_schedules[room->no_sched - 1].time);
-    k_sem_give(&new_data_sem);
 
     register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &room->list_of_schedules[room->no_sched - 1]);
-    
+    k_mutex_unlock(&room->lock);
+
+    k_sem_give(&new_data_sem);
+
     return 0;
 }
 
 int removeSchedule(struct TemperatureSchedule schedule) {
+    struct Room *room = schedule.parent_room;
 
-    for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
-        struct Room *room = schedule.parent_room;
+    k_mutex_lock(&room->lock, K_FOREVER);
 
-        if (room->no_sched == 0) return 0;
-        struct TemperatureSchedule *list = room->list_of_schedules;
-
-        int index = -1;
-
-        for (int i = 0; i < room->no_sched; i++) {
-            if (list[i].time == schedule.time && 
-                list[i].temperature == schedule.temperature) {
-                index = i;
-                break;
-            }
-        }
-
-        if (index == -1) {
-            return -ENOENT;
-        }
-
-        register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &list[index]);
-        
-        for (int i = index; i < room->no_sched - 1; i++) {
-            list[i] = list[i + 1];
-        }
-
-        room->no_sched--;
-
-        k_sem_give(&new_data_sem);
-
+    if (room->no_sched == 0) {
+        k_mutex_unlock(&room->lock);
+        return 0;
     }
+
+    struct TemperatureSchedule *list = room->list_of_schedules;
+    int index = -1;
+
+    for (int i = 0; i < room->no_sched; i++) {
+        if (list[i].time == schedule.time &&
+            list[i].temperature == schedule.temperature) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index == -1) {
+        k_mutex_unlock(&room->lock);
+        return -ENOENT;
+    }
+
+    register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &list[index]);
+
+    // Shift remaining schedules down
+    for (int j = index; j < room->no_sched - 1; j++) {
+        list[j] = list[j + 1];
+    }
+
+    room->no_sched--;
+    k_mutex_unlock(&room->lock);
+
+    k_sem_give(&new_data_sem);
 
     return 0;
 }

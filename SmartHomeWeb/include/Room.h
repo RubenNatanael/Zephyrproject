@@ -99,6 +99,8 @@ struct Room {
                                                //         100 - 1.00 C
     struct TemperatureSchedule list_of_schedules[MAX_SCHEDULES_PER_ROOM];
     uint8_t no_sched;
+
+    struct k_mutex lock;
 };
 
 void gpio_event_action(void *ctx, uint32_t value);
