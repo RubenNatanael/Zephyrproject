@@ -83,11 +83,11 @@ uint32_t to_seconds_today(struct rtc_time time) {
 
 // Schedule
 
-struct TemperatureSchedule* get_next_schedule() {
+struct Schedule* get_next_schedule() {
     int current_time = get_seconds_today_from_rtc();
 
-    struct TemperatureSchedule *best_today = NULL;
-    struct TemperatureSchedule *earliest_tomorrow = NULL;
+    struct Schedule *best_today = NULL;
+    struct Schedule *earliest_tomorrow = NULL;
 
     for (int id = 0; id < STRUCT_ROOM_COUNT; id++) {
         struct Room *room = get_room_by_id(id);
@@ -99,7 +99,7 @@ struct TemperatureSchedule* get_next_schedule() {
         }
 
         for (int i = 0; i < room->no_sched; i++) {
-            struct TemperatureSchedule *current_s = &room->list_of_schedules[i];
+            struct Schedule *current_s = &room->list_of_schedules[i];
 
             // Track the earliest overall (in case we need to roll over to tomorrow)
             if (earliest_tomorrow == NULL || current_s->time < earliest_tomorrow->time) {
@@ -119,7 +119,7 @@ struct TemperatureSchedule* get_next_schedule() {
     return (best_today != NULL) ? best_today : earliest_tomorrow;
 }
 
-uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule) {
+uint32_t calculate_time_for_schedule(struct Schedule* schedule) {
     
     int current_time = get_seconds_today_from_rtc();
     int diff = schedule->time - current_time;
@@ -130,7 +130,7 @@ uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule) {
     return (uint32_t)diff;
 }
 
-int addNewSchedule(struct TemperatureSchedule schedule) {
+int addNewSchedule(struct Schedule schedule) {
     struct Room *room = schedule.parent_room;
 
     k_mutex_lock(&room->lock, K_FOREVER);
@@ -140,7 +140,7 @@ int addNewSchedule(struct TemperatureSchedule schedule) {
     }
     room->list_of_schedules[room->no_sched] = schedule;
     room->no_sched++;
-    LOG_DBG("Temperature in room %d is %d", room->room_id, room->list_of_schedules[room->no_sched - 1].temperature);
+    LOG_DBG("Schedule in room %d value is %d", room->room_id, room->list_of_schedules[room->no_sched - 1].value);
     LOG_DBG("Adding new schedule and notifing(nr of sched: %d), time %d", room->no_sched, room->list_of_schedules[room->no_sched - 1].time);
 
     register_new_web_event(room->room_id, SCHEDULE_ADDED_EV, &room->list_of_schedules[room->no_sched - 1]);
@@ -151,7 +151,7 @@ int addNewSchedule(struct TemperatureSchedule schedule) {
     return 0;
 }
 
-int removeSchedule(struct TemperatureSchedule schedule) {
+int removeSchedule(struct Schedule schedule) {
     struct Room *room = schedule.parent_room;
 
     k_mutex_lock(&room->lock, K_FOREVER);
@@ -161,12 +161,12 @@ int removeSchedule(struct TemperatureSchedule schedule) {
         return 0;
     }
 
-    struct TemperatureSchedule *list = room->list_of_schedules;
+    struct Schedule *list = room->list_of_schedules;
     int index = -1;
 
     for (int i = 0; i < room->no_sched; i++) {
         if (list[i].time == schedule.time &&
-            list[i].temperature == schedule.temperature) {
+            list[i].value == schedule.value) {
             index = i;
             break;
         }
@@ -190,4 +190,23 @@ int removeSchedule(struct TemperatureSchedule schedule) {
     k_sem_give(&new_data_sem);
 
     return 0;
+}
+
+void execute_schedule(struct Schedule *schedule) {
+    switch (schedule->type)
+    {
+    case SETPOINT_SCH:
+        register_new_event(schedule->parent_room, schedule->value, SETPOINT_EV, true);
+        k_mutex_lock(&schedule->parent_room->lock, K_FOREVER);
+        schedule->parent_room->desired_temperature = schedule->value;
+        k_mutex_unlock(&schedule->parent_room->lock);
+        break;
+    case LIGHT_SCH:
+        k_mutex_lock(&schedule->parent_room->lock, K_FOREVER);
+        process_light_control(schedule->parent_room, schedule->value);
+        k_mutex_unlock(&schedule->parent_room->lock);
+        break;
+    default:
+        break;
+    }
 }

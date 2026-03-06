@@ -253,9 +253,8 @@ bool register_new_web_event(uint32_t room_id, enum VALUE_TYPE value_type, void *
     new_web_event->value_type = value_type;
 
     if (value_type == SCHEDULE_ADDED_EV) {
-        struct TemperatureSchedule *sched = (struct TemperatureSchedule *)data; 
-        new_web_event->data.sched.time = sched->time;
-        new_web_event->data.sched.temperature = sched->temperature;
+        struct Schedule *sched = (struct Schedule *)data; 
+        new_web_event->data.sched = sched;
     } else {
         new_web_event->data.value = *(uint32_t*)data;
     }

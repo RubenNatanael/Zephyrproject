@@ -10,9 +10,15 @@ extern struct k_sem new_data_sem;
 
 struct Room;
 
-struct TemperatureSchedule {
+enum SCHED_TYPE {
+    SETPOINT_SCH,
+    LIGHT_SCH
+};
+
+struct Schedule {
     int time; // seconds from midnight
-    int temperature; // scale 100/1
+    int value;
+    enum SCHED_TYPE type;
     struct Room *parent_room;
 };
 
@@ -22,14 +28,16 @@ uint32_t get_seconds_today_from_rtc(void);
 
 // Schedule
 
-struct TemperatureSchedule* get_next_schedule();
+struct Schedule* get_next_schedule();
 
-uint32_t calculate_time_for_schedule(struct TemperatureSchedule* schedule);
+uint32_t calculate_time_for_schedule(struct Schedule* schedule);
 
-int addNewSchedule(struct TemperatureSchedule schedule);
+int addNewSchedule(struct Schedule schedule);
 
-int removeSchedule(struct TemperatureSchedule schedule);
+int removeSchedule(struct Schedule schedule);
 
 uint32_t to_seconds_today(struct rtc_time time);
+
+void execute_schedule(struct Schedule *schedule);
 
 #endif

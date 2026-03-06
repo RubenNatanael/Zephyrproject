@@ -181,10 +181,11 @@ static bool parse_schedule_post(uint8_t *buf, size_t len)
 	zephyr_rtc_time.tm_sec  = 0;
     zephyr_rtc_time.tm_min  = cmd.min;
     zephyr_rtc_time.tm_hour = cmd.hour;
-	struct TemperatureSchedule schedule = {
+	struct Schedule schedule = {
     	.parent_room = get_room_by_id(cmd.room_id),
     	.time = to_seconds_today(zephyr_rtc_time),
-		.temperature = cmd.setpoint_temp_value,
+		.value = cmd.setpoint_temp_value,
+		.type = SETPOINT_SCH,
 	};
 	LOG_INF("WEB time is %d", schedule.time);
 	if (cmd.isAdd) {
@@ -377,7 +378,7 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 
 			for (size_t j = 0; j < hardware_rooms[i]->no_sched; j++) {
 				collection.rooms[i].schedules[j].time = hardware_rooms[i]->list_of_schedules[j].time;
-				collection.rooms[i].schedules[j].temperature = hardware_rooms[i]->list_of_schedules[j].temperature;
+				collection.rooms[i].schedules[j].temperature = hardware_rooms[i]->list_of_schedules[j].value;
 			}
 			k_mutex_unlock(&hardware_rooms[i]->lock);
 		}
@@ -569,8 +570,8 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 			case SCHEDULE_ADDED_EV:
 				struct TempSchedData room_temp_sched_data;
 				room_temp_sched_data.room_id = new_web_event->room_id;
-				room_temp_sched_data.time = new_web_event->data.sched.time;
-				room_temp_sched_data.temperature = new_web_event->data.sched.temperature;
+				room_temp_sched_data.time = new_web_event->data.sched->time;
+				room_temp_sched_data.temperature = new_web_event->data.sched->value;
 				ret = json_obj_encode_buf(temp_sched_command_descr,
 											ARRAY_SIZE(temp_sched_command_descr),
 											&room_temp_sched_data,

@@ -109,9 +109,9 @@ void execut_events_thread(void) {
     }
 }
 
-void temperature_schedule_thread() {
+void schedule_thread() {
     while(1) {
-        struct TemperatureSchedule *next = get_next_schedule();
+        struct Schedule *next = get_next_schedule();
         if (next == NULL) {
             k_sem_take(&new_data_sem, K_FOREVER); // Sleep until a new schedule is added
             continue;
@@ -125,11 +125,8 @@ void temperature_schedule_thread() {
         int ret = k_sem_take(&new_data_sem, K_SECONDS(sleep_ms));
 
         if (ret == -EAGAIN) {
-            LOG_INF("Schedule, setting temperature to %d", next->temperature);
-            register_new_event(next->parent_room, next->temperature, SETPOINT_EV, true);
-            k_mutex_lock(&next->parent_room->lock, K_FOREVER);
-            next->parent_room->desired_temperature = next->temperature;
-            k_mutex_unlock(&next->parent_room->lock);
+            LOG_INF("Schedule, setting value to %d", next->value);
+            execute_schedule(next);
             k_sleep(K_SECONDS(5)); // Sleep 5 sec to ensure function is not called again(~error from time)
             continue;
         }
@@ -179,5 +176,5 @@ K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
-K_THREAD_DEFINE(executin_schedle_id, STACKSIZE, temperature_schedule_thread, NULL, NULL, NULL,
+K_THREAD_DEFINE(executin_schedle_id, STACKSIZE, schedule_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);

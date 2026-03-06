@@ -58,7 +58,7 @@ struct WebEvent {
     enum VALUE_TYPE value_type;
     union {
         uint32_t value;
-        struct TemperatureSchedule sched;
+        struct Schedule *sched;
     } data;
 };
 
@@ -92,7 +92,7 @@ struct Room {
                                                //         50  - 0.50 C
                                                //         75  - 0.75 C
                                                //         100 - 1.00 C
-    struct TemperatureSchedule list_of_schedules[MAX_SCHEDULES_PER_ROOM];
+    struct Schedule list_of_schedules[MAX_SCHEDULES_PER_ROOM];
     uint8_t no_sched;
 
     struct k_mutex lock;
