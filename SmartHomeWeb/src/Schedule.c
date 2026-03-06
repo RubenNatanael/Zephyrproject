@@ -1,5 +1,7 @@
 #include "Schedule.h"
 
+#include "Room.h"
+
 LOG_MODULE_REGISTER(schedule, LOG_LEVEL_DBG);
 
 // Getting Time and setting it RTC

@@ -13,6 +13,7 @@
 #include <zephyr/drivers/sensor_data_types.h>
 
 #include "config.h"
+#include "Schedule.h"
 
 extern struct k_fifo events_fifo;
 extern struct k_fifo web_events_fifo;
@@ -49,12 +50,6 @@ struct Event {
     event_action_t action;
     void *ctx;
     uint32_t value;
-};
-
-struct TemperatureSchedule {
-    int time; // seconds from midnight
-    int temperature; // scale 100/1
-    struct Room *parent_room;
 };
 
 struct WebEvent {

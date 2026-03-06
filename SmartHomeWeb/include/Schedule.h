@@ -1,14 +1,20 @@
 #ifndef SCHEDULE_H
 #define SCHEDULE_H
 
-#include "Room.h"
-
 #include <time.h>
 #include <zephyr/drivers/rtc.h>
 #include <zephyr/net/sntp.h>
 #include <zephyr/net/socket.h>
 
 extern struct k_sem new_data_sem;
+
+struct Room;
+
+struct TemperatureSchedule {
+    int time; // seconds from midnight
+    int temperature; // scale 100/1
+    struct Room *parent_room;
+};
 
 void sync_rtc_with_network();
 

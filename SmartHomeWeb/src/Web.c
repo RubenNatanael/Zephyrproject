@@ -530,12 +530,12 @@ void ws_thread(void *arg1, void *arg2, void *arg3)
 			}
 			case HEAT_EV:
 			case HUM_EV: {
-				struct Room *r = get_room_by_id(new_web_event->room_id);
+				struct Room *room = get_room_by_id(new_web_event->room_id);
 				struct room_temp_read_command room_data;
 				room_data.room_id = new_web_event->room_id;
-				k_mutex_lock(&room->lock);
-				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->data.value : (r ? r->temp_sensor_value : 0);
-    			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->data.value : (r ? r->hum_sensor_value : 0);
+				k_mutex_lock(&room->lock, K_FOREVER);
+				room_data.temp_value = (new_web_event->value_type == HEAT_EV) ? new_web_event->data.value : (room ? room->temp_sensor_value : 0);
+    			room_data.hum_value = (new_web_event->value_type == HUM_EV) ? new_web_event->data.value : (room ? room->hum_sensor_value : 0);
 				k_mutex_unlock(&room->lock);
 				ret = json_obj_encode_buf(room_temp_command_descr,
 												ARRAY_SIZE(room_temp_command_descr),
