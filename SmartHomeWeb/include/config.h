@@ -24,4 +24,6 @@ LOG_LEVEL_NONE - 0
 LOG_LEVEL_WRN - 2
 */
 
+#define CONTROLL_BOILER
+
 #endif

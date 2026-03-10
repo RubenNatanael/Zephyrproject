@@ -49,7 +49,10 @@ RTIO_DEFINE(dht_ctx, 1, 1);
 #define DHT11_NODE DT_ALIAS(dht11)
 static const struct device *const dht11_temp_sensor = DEVICE_DT_GET(DHT11_NODE);
 
-
+#ifdef CONTROLL_BOILER
+static const struct gpio_dt_spec* boiler_gpio = NULL;    // OUTPUT GPIO
+static uint16_t boiler_gpio_value = 0;
+#endif
 
 static struct Room lr_room  = { 
     .room_id = LIVINROOM_ROOM,
@@ -341,10 +344,21 @@ static void turn_on_off_temperature(struct Room *room, bool turn_on) {
     if (turn_on && room->heat_relay_state == false) {
         register_new_event(room, 1, HEAT_RELAY_EV, true);
         room->heat_relay_state = true;
+        boiler_gpio_value++;
     } else if (!turn_on && room->heat_relay_state == true) {
         register_new_event(room, 0, HEAT_RELAY_EV, true);
         room->heat_relay_state = false;
+        boiler_gpio_value--;
     }
+
+#ifdef CONTROLL_BOILER
+    // If at least, one room use heat, we turn on general boiler
+    if (boiler_gpio_value > 0 && boiler_gpio_value - 1 > 0) {
+        gpio_pin_set(boiler_gpio->port, boiler_gpio->pin, 1);
+    } else  if (boiler_gpio_value < 0){
+        gpio_pin_set(boiler_gpio->port, boiler_gpio->pin, 0);
+    }
+#endif
 }
 
 void process_temperature_control(struct Room *room) {
