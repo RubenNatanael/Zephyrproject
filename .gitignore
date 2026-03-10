@@ -1,0 +1,26 @@
+# IDE and Editor directories
+.vscode/
+.claude/
+
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.hex
+
+# Zephyr specific
+.west/
+zephyr/.config
+zephyr/.config.old
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+CLAUDE.md
