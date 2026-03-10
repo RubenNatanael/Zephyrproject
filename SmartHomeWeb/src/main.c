@@ -35,12 +35,12 @@ void listening_switch_events_thread(void) {
 
         for (int i = 0; i < STRUCT_ROOM_COUNT; i++) {
 
-            // uint32_t new_state = gpio_pin_get_dt(rooms[i]->light_switch);
+            uint32_t new_state = gpio_pin_get_dt(rooms[i]->light_switch);
 
-            // // In case is a PWM event light needs special value so I calculated it here (90% of brightness for ON state)
-            // new_state = rooms[i]->light_pwm->period * percentage_ / 100;
+            // In case is a PWM event light needs special value so I calculated it here (90% of brightness for ON state)
+            new_state = rooms[i]->light_pwm->period * percentage_ / 100;
 
-            // process_light_control(rooms[i], new_state);
+            process_light_control(rooms[i], new_state);
         }
 
         k_msleep(SLEEP_TIME_MS);
@@ -170,8 +170,8 @@ int main(void)
 }
 
 // --- Thread definitions ---
-K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
-                PRIORITY_7, 0, 0);
+// K_THREAD_DEFINE(listening_id, STACKSIZE, listening_switch_events_thread, NULL, NULL, NULL,
+//                 PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(execut_id, STACKSIZE, execut_events_thread, NULL, NULL, NULL,
                 PRIORITY_7, 0, 0);
 K_THREAD_DEFINE(listening_tmp_id, STACKSIZE, listening_tmp_events_thread, NULL, NULL, NULL,
