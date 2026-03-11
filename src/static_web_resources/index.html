@@ -54,7 +54,16 @@
         .btn-add-main{width:100%;padding:8px;background:0 0;border:1px dashed var(--primary);color:var(--primary);border-radius:10px;margin-bottom:10px;cursor:pointer}
         .btn-del{background:0 0;border:0;color:#ef4444;cursor:pointer;font-size:1.1rem;padding:0 5px}
         .btn-add {background: #dfd;color: #040;border: 1px solid #ccc;border-radius: 3px;padding: 2px 6px;}
-        
+
+        /* Login Modal */
+        #login-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:10000;justify-content:center;align-items:center}
+        #login-modal.show{display:flex}
+        .login-box{background:var(--card);border:2px solid var(--primary);border-radius:20px;padding:40px;width:300px}
+        .login-box h3{margin:0 0 20px;color:var(--primary);text-align:center}
+        .login-box input{width:100%;padding:12px;margin-bottom:15px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#fff;font-size:1rem;box-sizing:border-box}
+        .login-box button{width:100%;padding:12px;background:var(--primary);border:0;border-radius:8px;color:#fff;font-weight:700;cursor:pointer}
+        .login-error{color:#ef4444;font-size:.85rem;text-align:center;margin-top:10px;display:none}
+        .login-error.show{display:block}
     </style>
 </head>
 <body>
@@ -62,7 +71,62 @@
     <h2 style="color: #a855f7; margin-bottom: 30px;">Nucleo Control</h2>
     <div class="grid" id="container"></div>
 
+    <div id="login-modal">
+        <div class="login-box">
+            <h3>🔐 Login</h3>
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="attemptLogin()">Login</button>
+            <div class="login-error" id="login-error">Invalid credentials</div>
+        </div>
+    </div>
+
     <script>
+        // Authentication
+        let authCredentials=null;
+        function showLoginModal(){
+            document.getElementById('login-modal').classList.add('show');
+            document.getElementById('login-error').classList.remove('show')
+        }
+        function hideLoginModal(){
+            document.getElementById('login-modal').classList.remove('show')
+        }
+        async function attemptLogin(){
+            const p=document.getElementById('password').value;
+            if(!p)
+            {
+                document.getElementById('login-error').textContent='Enter credentials';
+                document.getElementById('login-error').classList.add('show');
+                return
+            }
+            authCredentials=p;
+            try{
+                const r=await fetch('/api/v1/is_up',{headers:{'Authorization':'Basic '+btoa(authCredentials)}});
+                if(r.ok){
+                    hideLoginModal();
+                    fetchRooms()
+                }else{
+                    document.getElementById('login-error').textContent='Invalid credentials';
+                    document.getElementById('login-error').classList.add('show');authCredentials=null
+                }
+            }catch(e){
+                document.getElementById('login-error').textContent='Connection error';document.getElementById('login-error').classList.add('show');
+                authCredentials=null
+            }
+        }
+        async function authFetch(url,options={})
+        {
+            if(authCredentials){
+            options.headers=options.headers||{};
+            options.headers['Authorization']='Basic '+btoa(authCredentials)
+            }
+            const response=await fetch(url,options);
+            if(response.status===401){
+                showLoginModal();
+                throw new Error('Unauthorized')
+            }
+            return response
+        }
+
         // "temp" is what the sensor reads. "setpoint" is what the user wants.
         const rooms = [
             { room_id: 0, room_name: 'Test Room', temp_sensor_value: 2400, desired_temperature: 2200, light_gpio_value: 1, hum_sensor_value: 50, heat_relay_state: 0, schedules:[{room_id: 0, time: 43200, temperature: 2300}] },
@@ -266,7 +330,7 @@
 	        "min": min,
 	        "isAdd": isAdd});
             try {
-                await fetch(path_url, {
+                await authFetch(path_url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: payload
@@ -279,7 +343,7 @@
             let path_url = '/api/v1/light';
             let payload = JSON.stringify({"room_id" : roomId, "light_value" : value});
             try {
-                await fetch(path_url, {
+                await authFetch(path_url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: payload
@@ -304,7 +368,7 @@
             container.innerHTML = '<p style="color: var(--text-dim);">Loading rooms...</p>';
 
             try {
-                const response = await fetch('/api/v1/rooms');
+                const response = await authFetch('/api/v1/rooms');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

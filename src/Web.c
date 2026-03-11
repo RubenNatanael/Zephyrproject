@@ -7,14 +7,14 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/net/websocket.h>
 #include <zephyr/sys/time_units.h>
+#include <zephyr/net/sntp.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/drivers/rtc.h>
 
 #include "Room.h"
 #include "config.h"
 #include "Schedule.h"
-
-#include <zephyr/net/sntp.h>
-#include <zephyr/net/socket.h>
-#include <zephyr/drivers/rtc.h>
+#include "utilities.h"
 
 LOG_MODULE_REGISTER(web_server, LOG_LEVEL_DBG);
 static uint16_t ui_port = 80;
@@ -23,6 +23,37 @@ static const uint8_t index_html[] = {
 #include "index.html.gz.inc"
 };
 
+bool check_auth(const struct http_request_ctx *request_ctx)
+{
+    const char *auth_header = NULL;
+
+    // Search for Authorization header
+    for (size_t i = 0; i < request_ctx->header_count; i++) {
+        if (strcmp(request_ctx->headers[i].name, "Authorization") == 0) {
+            auth_header = request_ctx->headers[i].value;
+            break;
+        }
+    }
+
+    if (!auth_header) {
+        return false;
+    }
+
+    const char *encoded = auth_header + 6;
+
+    unsigned char decoded[20];
+    size_t decoded_len;
+
+    int ret = base64_decode(encoded, decoded, sizeof(decoded), &decoded_len);
+
+    if (ret != 0) {
+        return false;
+    }
+
+    decoded[decoded_len] = '\0';
+
+    return (strcmp((char *)decoded, "parola") == 0);
+}
 /* JSON commands definition */
 struct led_command {
 	int led_num;
@@ -302,6 +333,12 @@ static int post_handler(struct http_client_ctx *client, enum http_data_status st
 		       const struct http_request_ctx *request_ctx,
 		       struct http_response_ctx *response_ctx, void *user_data)
 {
+#ifdef LOGIN
+    if (!check_auth(request_ctx)) {
+		http_response(response_ctx, 401, NULL, 0, true);
+        return 0;
+    }
+#endif
 
 	struct post_state *state = user_data;
 
@@ -359,6 +396,13 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		       const struct http_request_ctx *request_ctx,
 		       struct http_response_ctx *response_ctx, void *user_data)
 {
+#ifdef LOGIN
+    if (!check_auth(request_ctx)) {
+		http_response(response_ctx, 401, NULL, 0, true);
+        return 0;
+    }
+#endif
+
 	if (status == HTTP_SERVER_DATA_FINAL) {
 		static char json_buf[512];
 
@@ -399,6 +443,14 @@ static int rooms_get_handler(struct http_client_ctx *client, enum http_data_stat
 		size_t json_len = strlen(json_buf);
 		http_response(response_ctx, 200, json_buf, json_len, true);
 	}
+	return 0;
+}
+
+static int up_handler(struct http_client_ctx *client, enum http_data_status status,
+		       const struct http_request_ctx *request_ctx,
+		       struct http_response_ctx *response_ctx, void *user_data)
+{
+	http_response(response_ctx, 200, NULL, 0, true);
 	return 0;
 }
 
@@ -456,6 +508,15 @@ static struct http_resource_detail_dynamic room_command_detail = {
 			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
 		},
 	.cb = rooms_get_handler,
+	.user_data = NULL,
+};
+
+static struct http_resource_detail_dynamic is_up_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_DYNAMIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
+		},
+	.cb = up_handler,
 	.user_data = NULL,
 };
 /* END HTTP resource definitions */
@@ -653,6 +714,8 @@ HTTP_RESOURCE_DEFINE(temp_res, test_http_service, "/api/v1/temp", &room_temp_res
 HTTP_RESOURCE_DEFINE(sched_res, test_http_service, "/api/v1/schedule", &room_schedule_resource_detail);
 
 HTTP_RESOURCE_DEFINE(room_res, test_http_service, "/api/v1/rooms", &room_command_detail);
+
+HTTP_RESOURCE_DEFINE(up_res, test_http_service, "/api/v1/is_up", &is_up_detail);
 
 HTTP_RESOURCE_DEFINE(ws_res, test_http_service, "/ws", &ws_resource_detail);
 

@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define DEBUG_MODE
+
 #define MAX_ROOMS 5
 
 #define MAX_WS_CLIENTS 5
@@ -15,7 +17,13 @@
 
 #define UTC_PLUS_2 (2 * 3600) // UTC+2
 
+#ifdef DEBUG_MODE
 #define LOG_LEVEL LOG_LEVEL_DBG
+#define LOGIN   \// To be removed after testing 
+#else
+#define LOG_LEVEL LOG_LEVEL_INF
+#define LOGIN
+#endif
 /*
 LOG_LEVEL_DBG - 4
 LOG_LEVEL_ERR - 1
