@@ -1,0 +1,29 @@
+name: Nucleo Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: app  # Your code goes here
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Zephyr
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: app
+          toolchains: arm-zephyr-eabi # Only downloads what you need
+
+      - name: Build Firmware
+        working-directory: app
+        run: |
+          export ZEPHYR_SDK_INSTALL_DIR=$ZEPHYR_SDK_INSTALL_DIR
+          west build -b nucleo_f767zi . --pristine

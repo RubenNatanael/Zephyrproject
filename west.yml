@@ -1,0 +1,20 @@
+manifest:
+  self:
+    path: app
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v3.6.0
+      clone-depth: 1
+      import:
+        name-allowlist:
+          - cmsis_6
+          - hal_adi
+          - hal_nxp
+          - hal_stm32
+          - picolibc
